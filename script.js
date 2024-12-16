@@ -9,14 +9,15 @@ async function loadModel() {
 // Preprocess the image before passing it to the model
 function preprocessImage(image) {
     return tf.tidy(() => {
+        // Convert image to tensor and resize it to match model input size
         const tensor = tf.browser.fromPixels(image)
             .resizeBilinear([256, 256])  // Resize to the input size expected by the model
             .div(tf.scalar(255))         // Normalize to [0, 1]
-            .expandDims(0);              // Add batch dimension
+            .expandDims(0);              // Add batch dimension (1 image in a batch)
+        
         return tensor;
     });
 }
-
 // Detect the font from the image
 async function detectFont(image) {
     const preprocessedImage = preprocessImage(image);
