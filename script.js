@@ -29,14 +29,64 @@ async function detectFont(image) {
     return { font: predictedFont, confidence };
 }
 
+// Convert a PDF file to an image using pdf.js
+function convertPdfToImage(pdfFile) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const typedarray = new Uint8Array(e.target.result);
+            pdfjsLib.getDocument(typedarray).promise.then(pdf => {
+                pdf.getPage(1).then(page => {
+                    const viewport = page.getViewport({ scale: 1 });
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    page.render({
+                        canvasContext: context,
+                        viewport: viewport
+                    }).promise.then(() => {
+                        resolve(canvas);
+                    }).catch(reject);
+                });
+            }).catch(reject);
+        };
+        reader.readAsArrayBuffer(pdfFile);
+    });
+}
+
 // Handle file input and image processing when the user clicks the 'Upload and Process' button
 async function handleUpload(event) {
     const fileInput = document.getElementById('file');
     const file = fileInput.files[0];
 
     if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
+        const fileType = file.type;
+
+        if (fileType.startsWith('image/')) {
+            // If it's an image, process it directly
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = async function() {
+                    // Run the font detection model
+                    const result = await detectFont(img);
+
+                    // Displaying the result
+                    const resultDiv = document.getElementById("font-detected");
+                    resultDiv.innerHTML = `
+                        <h3>Detected Font:</h3>
+                        <p><strong>Font:</strong> ${result.font}</p>
+                        <p><strong>Confidence:</strong> ${result.confidence.toFixed(2)}</p>
+                        <img src="${e.target.result}" alt="Uploaded Image" style="max-width: 200px; margin-top: 10px;">
+                    `;
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        } else if (fileType === 'application/pdf') {
+            // If it's a PDF, convert it to an image
+            const canvas = await convertPdfToImage(file);
             const img = new Image();
             img.onload = async function() {
                 // Run the font detection model
@@ -48,12 +98,11 @@ async function handleUpload(event) {
                     <h3>Detected Font:</h3>
                     <p><strong>Font:</strong> ${result.font}</p>
                     <p><strong>Confidence:</strong> ${result.confidence.toFixed(2)}</p>
-                    <img src="${e.target.result}" alt="Uploaded Image" style="max-width: 200px; margin-top: 10px;">
+                    <img src="${canvas.toDataURL()}" alt="Converted PDF Image" style="max-width: 200px; margin-top: 10px;">
                 `;
             };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
+            img.src = canvas.toDataURL();
+        }
     }
 }
 
