@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OCR File Processor</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <link rel="stylesheet" href="styles.css"> <!-- Reference to your local CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script> <!-- TensorFlow.js -->
     <script>
         let model;
 
@@ -63,7 +63,7 @@
     <header class="main-header">
         <div class="top-section">
             <div class="logo">
-                <img src="images/rupp_logo.png" alt="University Logo">
+                <img src="images/rupp_logo.png" alt="University Logo"> <!-- Static image path -->
             </div>
             <div class="title">
                 <h1>សាកលវិទ្យាល័យភូមិន្ទភ្នំពេញ</h1>
@@ -78,32 +78,11 @@
 
     <div class="form-container">
         <h2 class="form-title">Upload Your File for OCR Processing</h2>
-        <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
-            <label for="file">Choose a file:</label>
-            <input type="file" id="file" name="file" accept=".pdf, .jpg, .jpeg, .png, .bmp, .tiff" required>
-            <br><br>
-            <button type="submit">Upload and Process</button>
-        </form>
+        <!-- File input for selecting images -->
+        <input type="file" id="file" name="file" accept="image/*" required>
     </div>
 
-    {% if doc_text %}
-    <div class="result-container">
-        <h2>OCR and Font Detection Result</h2>
-        <p><strong>Detected Font:</strong> {{ font_name }} (Confidence: {{ font_confidence }})</p>
-        <p><strong>Document Text:</strong></p>
-        <div class="doc-content">
-            <pre>{{ doc_text }}</pre>
-        </div>
-        <br>
-        <a href="{{ url_for('download', filename=download_link) }}" class="download-button">Download DOCX</a>
-    </div>
-    {% elif error_message %}
-    <div class="error-message">
-        <p>{{ error_message }}</p>
-    </div>
-    {% endif %}
-
-    <!-- Font detection result displayed dynamically -->
+    <!-- Font detection result will be displayed here -->
     <div id="font-detected" class="font-detection-result"></div>
 
 </body>
