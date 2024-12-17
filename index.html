@@ -4,16 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OCR File Processor</title>
+    <!-- Styles -->
     <link rel="stylesheet" href="styles.css">
+    <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script> <!-- TensorFlow.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script> <!-- PDF.js -->
-    <script defer src="script.js"></script>
 </head>
 <body>
     <header class="main-header">
         <div class="top-section">
             <div class="logo">
-                <img src="images/rupp_logo.png" alt="University Logo" style="max-height: 100px;">
+                <img src="images/rupp_logo.png" alt="University Logo">
             </div>
             <div class="title">
                 <h1>សាកលវិទ្យាល័យភូមិន្ទភ្នំពេញ</h1>
@@ -26,31 +27,160 @@
         </div>
     </header>
 
-    <main class="form-container">
-        <h2 class="form-title">Upload Your File for OCR Processing</h2>
-        <form id="upload-form">
-            <label for="file">Choose a file:</label>
-            <input 
-                type="file" 
-                id="file" 
-                name="file" 
-                accept="image/*, .pdf" 
-                required
-                aria-label="Choose a file to upload"
-            >
-            <p id="file-name" style="margin-top: 10px; font-style: italic; color: gray;"></p>
-            <button type="button" id="process-button">Upload and Process</button>
-        </form>
+    <main>
+        <div class="form-container">
+            <h2 class="form-title">Upload Your File for OCR Processing</h2>
+            <form id="upload-form">
+                <label for="file" class="file-label">Choose a file:</label>
+                <input 
+                    type="file" 
+                    id="file" 
+                    name="file" 
+                    accept="image/*, .pdf" 
+                    required
+                    aria-label="Choose a file to upload"
+                >
+                <p id="file-name" style="margin-top: 10px; font-style: italic; color: gray;">No file selected</p>
+                <button type="button" id="process-button">Upload and Process</button>
+            </form>
+        </div>
+
+        <div id="loading-spinner" style="display: none;">
+            <p>Processing... Please wait.</p>
+            <img src="images/spinner.gif" alt="Loading spinner" class="spinner">
+        </div>
+
+        <section id="font-detected" class="font-detection-result">
+            <!-- Results will be displayed here -->
+        </section>
     </main>
 
-    <section id="font-detected" class="font-detection-result">
-        <!-- Results will be displayed here -->
-    </section>
+    <script>
+        // Show file name after selection
+        document.getElementById('file').addEventListener('change', function() {
+            const fileName = this.files[0]?.name || 'No file selected';
+            document.getElementById('file-name').innerText = fileName;
+        });
 
-    <!-- Loading Spinner -->
-    <div id="loading-spinner" style="display: none; text-align: center; margin-top: 20px;">
-        <p>Processing...</p>
-        <img src="images/spinner.gif" alt="Loading spinner" style="width: 50px; height: 50px;">
-    </div>
+        // Handle file upload and processing
+        document.getElementById('process-button').addEventListener('click', async function() {
+            const fileInput = document.getElementById('file');
+            const file = fileInput.files[0];
+            const outputArea = document.getElementById('font-detected');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const fileExt = file.name.split('.').pop().toLowerCase();
+
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+
+            // Show loading spinner
+            loadingSpinner.style.display = 'block';
+            outputArea.innerHTML = '';  // Clear previous results
+
+            try {
+                if (fileExt === 'pdf') {
+                    // Process PDF
+                    const pdfText = await processPDF(file);
+                    outputArea.innerHTML = `<h3>Font Detected: ${pdfText.font}</h3><p>Confidence: ${pdfText.confidence}</p><pre>${pdfText.text}</pre>`;
+                } else if (['jpg', 'jpeg', 'png', 'bmp', 'tiff'].includes(fileExt)) {
+                    // Process Image
+                    const img = await loadImage(file);
+                    const { font, confidence } = await detectFont(img);
+                    const ocrText = await runOCR(img);
+                    outputArea.innerHTML = `<h3>Font Detected: ${font}</h3><p>Confidence: ${confidence}</p><pre>${ocrText}</pre>`;
+                } else {
+                    alert("Unsupported file type.");
+                }
+            } catch (error) {
+                outputArea.innerHTML = `<p>Error: ${error.message}</p>`;
+            } finally {
+                loadingSpinner.style.display = 'none';  // Hide loading spinner
+            }
+        });
+
+        // Load image from file input
+        function loadImage(file) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = URL.createObjectURL(file);
+            });
+        }
+
+        // Run OCR on an image using Tesseract.js
+        function runOCR(image) {
+            return new Promise((resolve, reject) => {
+                Tesseract.recognize(
+                    image,
+                    'khm+eng',
+                    {
+                        logger: (m) => console.log(m),
+                    }
+                ).then(({ data: { text } }) => {
+                    resolve(text);
+                }).catch(reject);
+            });
+        }
+
+        // Detect font using the pre-trained TensorFlow.js model
+        async function detectFont(image) {
+            const model = await tf.loadLayersModel('./models/model.json');
+            const preprocessedImage = preprocessImage(image);
+            const predictions = await model.predict(preprocessedImage).data();
+            const fontClassIndex = predictions.indexOf(Math.max(...predictions));
+            const fontClasses = ["Khmer OS", "Khmer OS Battambong", "Khmer OS Siemreap"];
+            const predictedFont = fontClasses[fontClassIndex];
+            return { font: predictedFont, confidence: predictions[fontClassIndex] };
+        }
+
+        // Preprocess image for font classification
+        function preprocessImage(image, targetSize = [256, 256]) {
+            return tf.tidy(() => {
+                const tensor = tf.browser.fromPixels(image)
+                    .resizeBilinear(targetSize)
+                    .div(tf.scalar(255))
+                    .expandDims(0);  // Add batch dimension
+                return tensor;
+            });
+        }
+
+        // Process PDF and extract images
+        async function processPDF(file) {
+            const pdf = await pdfjsLib.getDocument(URL.createObjectURL(file)).promise;
+            const textData = [];
+            let font = null;
+            let confidence = null;
+
+            for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+                const page = await pdf.getPage(pageNumber);
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                const viewport = page.getViewport({ scale: 1 });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                await page.render({ canvasContext: context, viewport }).promise;
+
+                const image = canvas.toDataURL();  // Get image as data URL
+                const img = new Image();
+                img.src = image;
+
+                img.onload = async () => {
+                    const { font: pageFont, confidence: pageConfidence } = await detectFont(img);
+                    if (!font || pageConfidence > confidence) {
+                        font = pageFont;
+                        confidence = pageConfidence;
+                    }
+                };
+
+                const ocrText = await runOCR(img);
+                textData.push(ocrText);
+            }
+
+            return { text: textData.join('\n\n'), font, confidence };
+        }
+    </script>
 </body>
 </html>
