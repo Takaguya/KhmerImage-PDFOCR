@@ -9,8 +9,6 @@
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script> <!-- TensorFlow.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script> <!-- PDF.js -->
-    <!-- Custom Scripts -->
-    <script defer src="script.js"></script>
 </head>
 <body>
     <header class="main-header">
@@ -56,5 +54,133 @@
             <!-- Results will be displayed here -->
         </section>
     </main>
+
+    <script>
+        // Show file name after selection
+        document.getElementById('file').addEventListener('change', function() {
+            const fileName = this.files[0]?.name || 'No file selected';
+            document.getElementById('file-name').innerText = fileName;
+        });
+
+        // Handle file upload and processing
+        document.getElementById('process-button').addEventListener('click', async function() {
+            const fileInput = document.getElementById('file');
+            const file = fileInput.files[0];
+            const outputArea = document.getElementById('font-detected');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const fileExt = file.name.split('.').pop().toLowerCase();
+
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+
+            // Show loading spinner
+            loadingSpinner.style.display = 'block';
+            outputArea.innerHTML = '';  // Clear previous results
+
+            try {
+                if (fileExt === 'pdf') {
+                    // Process PDF
+                    const pdfText = await processPDF(file);
+                    outputArea.innerHTML = `<h3>Font Detected: ${pdfText.font}</h3><p>Confidence: ${pdfText.confidence}</p><pre>${pdfText.text}</pre>`;
+                } else if (['jpg', 'jpeg', 'png', 'bmp', 'tiff'].includes(fileExt)) {
+                    // Process Image
+                    const img = await loadImage(file);
+                    const { font, confidence } = await detectFont(img);
+                    const ocrText = await runOCR(img);
+                    outputArea.innerHTML = `<h3>Font Detected: ${font}</h3><p>Confidence: ${confidence}</p><pre>${ocrText}</pre>`;
+                } else {
+                    alert("Unsupported file type.");
+                }
+            } catch (error) {
+                outputArea.innerHTML = `<p>Error: ${error.message}</p>`;
+            } finally {
+                loadingSpinner.style.display = 'none';  // Hide loading spinner
+            }
+        });
+
+        // Load image from file input
+        function loadImage(file) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = URL.createObjectURL(file);
+            });
+        }
+
+        // Run OCR on an image using Tesseract.js
+        function runOCR(image) {
+            return new Promise((resolve, reject) => {
+                Tesseract.recognize(
+                    image,
+                    'khm+eng',
+                    {
+                        logger: (m) => console.log(m),
+                    }
+                ).then(({ data: { text } }) => {
+                    resolve(text);
+                }).catch(reject);
+            });
+        }
+
+        // Detect font using the pre-trained TensorFlow.js model
+        async function detectFont(image) {
+            const model = await tf.loadLayersModel('./models/model.json');
+            const preprocessedImage = preprocessImage(image);
+            const predictions = await model.predict(preprocessedImage).data();
+            const fontClassIndex = predictions.indexOf(Math.max(...predictions));
+            const fontClasses = ["Khmer OS", "Khmer OS Battambong", "Khmer OS Siemreap"];
+            const predictedFont = fontClasses[fontClassIndex];
+            return { font: predictedFont, confidence: predictions[fontClassIndex] };
+        }
+
+        // Preprocess image for font classification
+        function preprocessImage(image, targetSize = [256, 256]) {
+            return tf.tidy(() => {
+                const tensor = tf.browser.fromPixels(image)
+                    .resizeBilinear(targetSize)
+                    .div(tf.scalar(255))
+                    .expandDims(0);  // Add batch dimension
+                return tensor;
+            });
+        }
+
+        // Process PDF and extract images
+        async function processPDF(file) {
+            const pdf = await pdfjsLib.getDocument(URL.createObjectURL(file)).promise;
+            const textData = [];
+            let font = null;
+            let confidence = null;
+
+            for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+                const page = await pdf.getPage(pageNumber);
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                const viewport = page.getViewport({ scale: 1 });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                await page.render({ canvasContext: context, viewport }).promise;
+
+                const image = canvas.toDataURL();  // Get image as data URL
+                const img = new Image();
+                img.src = image;
+
+                img.onload = async () => {
+                    const { font: pageFont, confidence: pageConfidence } = await detectFont(img);
+                    if (!font || pageConfidence > confidence) {
+                        font = pageFont;
+                        confidence = pageConfidence;
+                    }
+                };
+
+                const ocrText = await runOCR(img);
+                textData.push(ocrText);
+            }
+
+            return { text: textData.join('\n\n'), font, confidence };
+        }
+    </script>
 </body>
 </html>
