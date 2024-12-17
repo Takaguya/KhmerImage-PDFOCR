@@ -55,11 +55,10 @@ body {
     background-color: #d32f2f;
     color: white;
     text-align: center;
-    padding: 10px 0;
-    font-size: 16px;
+    padding: 20px 0; /* Increased padding for a larger red bar */
+    font-size: 18px; /* Optionally increase the font size */
     font-weight: bold;
 }
-
 /* Form Container */
 .form-container {
     max-width: 600px;
