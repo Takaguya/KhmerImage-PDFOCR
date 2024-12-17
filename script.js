@@ -1,30 +1,31 @@
-// Load the model using TensorFlow.js
 let model;
+
+// Load the TensorFlow.js model
 async function loadModel() {
     try {
-        const modelUrl = './models/model.json';  // Adjust the path if needed
+        const modelUrl = './models/model.json'; // Adjust this path as needed
         model = await tf.loadLayersModel(modelUrl);
         console.log("Model loaded successfully!");
     } catch (error) {
-        console.error("Error loading model:", error);
+        console.error("Failed to load the model. Please check the model path or server configuration.", error);
     }
 }
 
-// Preprocess the image for font classification
-function preprocessImage(image, targetSize = [256, 256]) {
+// Preprocess the image before passing it to the model
+function preprocessImage(image) {
     return tf.tidy(() => {
         const tensor = tf.browser.fromPixels(image)
-            .resizeBilinear(targetSize)
-            .div(tf.scalar(255))
-            .expandDims(0);  // Add batch dimension
+            .resizeBilinear([256, 256])  // Resize to the input size expected by the model
+            .div(tf.scalar(255))         // Normalize to [0, 1]
+            .expandDims(0);              // Add batch dimension (1 image in a batch)
         return tensor;
     });
 }
 
-// Detect font using the pre-trained model
+// Detect the font from the image
 async function detectFont(image) {
     if (!model) {
-        console.error("Model is not loaded. Please wait.");
+        console.error("Model is not loaded yet! Please wait.");
         return null;
     }
 
@@ -38,138 +39,96 @@ async function detectFont(image) {
     return { font: predictedFont, confidence };
 }
 
-// Handle file upload and process it
+// Handle file input and image processing
 async function handleUpload() {
     const fileInput = document.getElementById('file');
     const file = fileInput.files[0];
 
     if (!file) {
-        alert("Please select a file!");
+        alert("Please upload a file first!");
         return;
     }
 
-    const fileExt = file.name.split('.').pop().toLowerCase();
-    const outputArea = document.getElementById('font-detected');
-    const spinner = document.getElementById('loading-spinner');
-    const downloadButton = document.getElementById('download-button');
-    spinner.style.display = 'block';  // Show loading spinner
-    outputArea.innerHTML = "";  // Clear previous results
-    downloadButton.style.display = 'none'; // Hide download button
+    const reader = new FileReader();
 
-    try {
-        let ocrText = '';
-        let fontInfo = '';
-        
-        if (fileExt === 'pdf') {
-            const pdfText = await processPDF(file);
-            ocrText = pdfText.text;
-            fontInfo = `Detected font: ${pdfText.font} (Confidence: ${pdfText.confidence})`;
-        } else if (['jpg', 'jpeg', 'png', 'bmp', 'tiff'].includes(fileExt)) {
-            const image = await loadImage(file);
-            const { font, confidence } = await detectFont(image);
-            ocrText = await runOCR(image); // Run OCR on image
-            fontInfo = `Detected font: ${font} (Confidence: ${confidence.toFixed(2)})`;
-        } else {
-            alert("Unsupported file type.");
-        }
+    if (file.type === 'application/pdf') {
+        // Handle PDF files
+        reader.onload = async function(e) {
+            const pdfData = e.target.result;
+            const images = await extractImagesFromPDF(pdfData);
+            if (images.length > 0) {
+                const img = images[0];
+                const result = await detectFont(img);
 
-        outputArea.innerHTML = `<p>${fontInfo}</p><pre>${ocrText}</pre>`;
-        downloadButton.style.display = 'block'; // Show download button
-        downloadButton.onclick = () => downloadOCRAsDocx(ocrText, fontInfo);
-        
-    } catch (error) {
-        console.error("Error processing file:", error);
-        outputArea.innerHTML = `<p>Error processing file: ${error.message}</p>`;
-    } finally {
-        spinner.style.display = 'none';  // Hide loading spinner
+                displayResult(result, img.toDataURL());
+            } else {
+                console.error("No images extracted from the PDF.");
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    } else {
+        // Handle image files
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = async function() {
+                const result = await detectFont(img);
+                displayResult(result, e.target.result);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
     }
 }
 
-// Load an image from the file input
-function loadImage(file) {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = URL.createObjectURL(file);
-    });
+// Display the result in the UI
+function displayResult(result, imageSrc) {
+    const resultDiv = document.getElementById("font-detected");
+
+    if (result) {
+        resultDiv.innerHTML = `
+            <h3>Detected Font:</h3>
+            <p><strong>Font:</strong> ${result.font}</p>
+            <p><strong>Confidence:</strong> ${result.confidence.toFixed(2)}</p>
+            <img src="${imageSrc}" alt="Uploaded Image" style="max-width: 200px; margin-top: 10px;">
+        `;
+    } else {
+        resultDiv.innerHTML = `
+            <h3>Error:</h3>
+            <p>Could not detect font. Ensure the model is loaded and the image is clear.</p>
+        `;
+    }
 }
 
-// Run OCR on an image using Tesseract.js
-function runOCR(image) {
+// Extract images from PDF using pdf.js
+async function extractImagesFromPDF(pdfData) {
     return new Promise((resolve, reject) => {
-        Tesseract.recognize(
-            image,
-            'khm+eng',
-            {
-                logger: (m) => console.log(m),
-            }
-        ).then(({ data: { text } }) => {
-            resolve(text);
+        const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+        loadingTask.promise.then(function(pdf) {
+            pdf.getPage(1).then(function(page) {
+                const scale = 1.5;
+                const viewport = page.getViewport({ scale: scale });
+                const canvas = document.createElement("canvas");
+                const context = canvas.getContext("2d");
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+
+                page.render(renderContext).promise.then(function() {
+                    resolve([canvas]); // Return the first page as an image (Canvas)
+                }).catch(reject);
+            });
         }).catch(reject);
     });
 }
 
-// Process PDF and extract images using PDF.js and OCR
-async function processPDF(file) {
-    const pdf = await pdfjsLib.getDocument(URL.createObjectURL(file)).promise;
-    const textData = [];
-    let font = null;
-    let confidence = null;
+// Add event listeners
+window.addEventListener('DOMContentLoaded', () => {
+    loadModel(); // Load the model when the page loads
 
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-        const page = await pdf.getPage(pageNumber);
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        const viewport = page.getViewport({ scale: 1 });
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        await page.render({ canvasContext: context, viewport }).promise;
-        
-        const image = canvas.toDataURL();  // Get image as data URL
-        const img = new Image();
-        img.src = image;
-        
-        img.onload = async () => {
-            const { font: pageFont, confidence: pageConfidence } = await detectFont(img);
-            if (!font || pageConfidence > confidence) {
-                font = pageFont;
-                confidence = pageConfidence;
-            }
-        };
-        
-        const ocrText = await runOCR(img);
-        textData.push(ocrText);
-    }
-
-    return {
-        text: textData.join('\n\n'),
-        font,
-        confidence,
-    };
-}
-
-// Function to create a DOCX file and download it
-function downloadOCRAsDocx(ocrText, fontInfo) {
-    const doc = new PizZip();
-    const template = docxtemplater(new PizZip("")); // Empty template
-
-    template.setData({
-        ocrText,
-        fontInfo
-    });
-
-    template.render();
-
-    const output = template.getZip().generate({ type: 'blob' });
-
-    const blob = new Blob([output], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'OCR_Result.docx';
-    link.click();
-}
-
-// Attach event listeners
-document.getElementById('upload-button').addEventListener('click', handleUpload);
-window.addEventListener('DOMContentLoaded', loadModel);
+    const processButton = document.getElementById('process-button');
+    processButton.addEventListener('click', handleUpload);
+});
