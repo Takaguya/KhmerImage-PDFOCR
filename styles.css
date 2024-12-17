@@ -12,9 +12,10 @@ body {
     line-height: 1.6;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start; /* Align to the top */
     min-height: 100vh;
     flex-direction: column;
+    text-align: center; /* Center text in body */
 }
 
 /* Main Header Section */
@@ -109,15 +110,18 @@ body {
     background-color: #b71c1c;
 }
 
-/* Result Container */
+/* Result Container - Centering */
 .result-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Center the content vertically */
+    align-items: center;     /* Center the content horizontally */
     max-width: 900px;
     margin: 30px auto;
     padding: 20px;
     background: #fff;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     border-radius: 8px;
-    text-align: center; /* Ensures that content inside is centered */
 }
 
 /* Font Detection Result */
