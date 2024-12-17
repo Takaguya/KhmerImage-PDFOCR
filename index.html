@@ -171,30 +171,41 @@
         // Detect font using the pre-trained ONNX model
         async function detectFont(image) {
             const session = new onnx.InferenceSession();
-            await session.loadModel('./models/model.onnx');  // Path to your ONNX model
-
+            try {
+                await session.loadModel('./models/model.onnx');  // Path to your ONNX model
+                console.log("Model loaded successfully.");
+            } catch (error) {
+                console.error("Error loading ONNX model:", error);
+                return { font: null, confidence: null, fontClass: null };
+            }
+        
             const preprocessedImage = preprocessImage(image);
+            console.log("Preprocessed image tensor:", preprocessedImage);
+        
             const inputTensor = new onnx.Tensor(preprocessedImage.dataSync(), 'float32', preprocessedImage.shape);
-
             const output = await session.run([inputTensor]);
+            
+            // Ensure output is valid
             const predictions = output.values().next().value.data;
-
+            console.log("Model predictions:", predictions);
+        
             const fontClassIndex = predictions.indexOf(Math.max(...predictions));
             const fontClasses = ["Khmer OS", "Khmer OS Battambong", "Khmer OS Siemreap"];
             const predictedFont = fontClasses[fontClassIndex];
-
+        
             const fontClassMap = {
                 "Khmer OS": "font-khmer-os",
                 "Khmer OS Battambong": "font-khmer-os-battambong",
                 "Khmer OS Siemreap": "font-khmer-os-siemreap"
             };
-
+        
             return {
                 font: predictedFont,
                 confidence: predictions[fontClassIndex],
                 fontClass: fontClassMap[predictedFont]
             };
         }
+
 
         // Preprocess image for font classification
         function preprocessImage(image, targetSize = [256, 256]) {
