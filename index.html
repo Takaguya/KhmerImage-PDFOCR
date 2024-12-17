@@ -54,9 +54,17 @@
             <img src="images/spinner.gif" alt="Loading spinner" class="spinner">
         </div>
 
-        <section id="font-detected" class="font-detection-result">
-            <!-- Results will be displayed here -->
-        </section>
+        <!-- Result Container for OCR and Font Detection -->
+        <div id="result-container" class="result-container" style="display: none;">
+            <div class="font-detection-result">
+                <h3 id="font-detected"></h3>
+                <p id="confidence"></p>
+            </div>
+            <div class="ocr-result">
+                <h3>OCR Result:</h3>
+                <div id="ocr-text" class="doc-preview"></div>
+            </div>
+        </div>
 
         <button id="download-docx" style="display:none;">Download DOCX</button>
     </main>
@@ -73,8 +81,11 @@
             const fileInput = document.getElementById('file');
             const file = fileInput.files[0];
             const outputArea = document.getElementById('font-detected');
+            const confidenceArea = document.getElementById('confidence');
+            const ocrTextArea = document.getElementById('ocr-text');
             const loadingSpinner = document.getElementById('loading-spinner');
             const downloadButton = document.getElementById('download-docx');
+            const resultContainer = document.getElementById('result-container');
             const fileExt = file.name.split('.').pop().toLowerCase();
 
             if (!file) {
@@ -84,25 +95,39 @@
 
             // Show loading spinner
             loadingSpinner.style.display = 'block';
-            outputArea.innerHTML = '';  // Clear previous results
+            resultContainer.style.display = 'none';  // Hide result container initially
 
             try {
                 let ocrText = '';
+                let font = '';
+                let confidence = '';
+                let fontClass = '';
 
                 if (fileExt === 'pdf') {
                     // Process PDF
                     const pdfText = await processPDF(file);
                     ocrText = pdfText.text;
-                    outputArea.innerHTML = `<h3>Font Detected: ${pdfText.font}</h3><p>Confidence: ${pdfText.confidence}</p><div class="doc-preview ${pdfText.fontClass}"><pre>${ocrText}</pre></div>`;
+                    font = pdfText.font;
+                    confidence = pdfText.confidence;
+                    fontClass = pdfText.fontClass;
                 } else if (['jpg', 'jpeg', 'png', 'bmp', 'tiff'].includes(fileExt)) {
                     // Process Image
                     const img = await loadImage(file);
-                    const { font, confidence, fontClass } = await detectFont(img);
+                    const { font: detectedFont, confidence: detectedConfidence, fontClass: detectedFontClass } = await detectFont(img);
                     ocrText = await runOCR(img);
-                    outputArea.innerHTML = `<h3>Font Detected: ${font}</h3><p>Confidence: ${confidence}</p><div class="doc-preview ${fontClass}"><pre>${ocrText}</pre></div>`;
+                    font = detectedFont;
+                    confidence = detectedConfidence;
+                    fontClass = detectedFontClass;
                 } else {
                     alert("Unsupported file type.");
+                    return;
                 }
+
+                // Display the result container with OCR and font detection details
+                resultContainer.style.display = 'block';
+                outputArea.innerHTML = `Font Detected: ${font}`;
+                confidenceArea.innerHTML = `Confidence: ${confidence}`;
+                ocrTextArea.innerHTML = `<pre>${ocrText}</pre>`;
 
                 // Show the download button after processing
                 downloadButton.style.display = 'inline-block';
