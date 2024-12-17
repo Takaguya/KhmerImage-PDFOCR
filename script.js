@@ -51,20 +51,32 @@ async function handleUpload() {
     const fileExt = file.name.split('.').pop().toLowerCase();
     const outputArea = document.getElementById('font-detected');
     const spinner = document.getElementById('loading-spinner');
+    const downloadButton = document.getElementById('download-button');
     spinner.style.display = 'block';  // Show loading spinner
+    outputArea.innerHTML = "";  // Clear previous results
+    downloadButton.style.display = 'none'; // Hide download button
 
     try {
+        let ocrText = '';
+        let fontInfo = '';
+        
         if (fileExt === 'pdf') {
             const pdfText = await processPDF(file);
-            outputArea.innerHTML = `<p>Detected font: ${pdfText.font} (Confidence: ${pdfText.confidence})</p><pre>${pdfText.text}</pre>`;
+            ocrText = pdfText.text;
+            fontInfo = `Detected font: ${pdfText.font} (Confidence: ${pdfText.confidence})`;
         } else if (['jpg', 'jpeg', 'png', 'bmp', 'tiff'].includes(fileExt)) {
             const image = await loadImage(file);
             const { font, confidence } = await detectFont(image);
-            const ocrText = await runOCR(image); // Run OCR on image
-            outputArea.innerHTML = `<p>Detected font: ${font} (Confidence: ${confidence.toFixed(2)})</p><pre>${ocrText}</pre>`;
+            ocrText = await runOCR(image); // Run OCR on image
+            fontInfo = `Detected font: ${font} (Confidence: ${confidence.toFixed(2)})`;
         } else {
             alert("Unsupported file type.");
         }
+
+        outputArea.innerHTML = `<p>${fontInfo}</p><pre>${ocrText}</pre>`;
+        downloadButton.style.display = 'block'; // Show download button
+        downloadButton.onclick = () => downloadOCRAsDocx(ocrText, fontInfo);
+        
     } catch (error) {
         console.error("Error processing file:", error);
         outputArea.innerHTML = `<p>Error processing file: ${error.message}</p>`;
@@ -135,6 +147,27 @@ async function processPDF(file) {
         font,
         confidence,
     };
+}
+
+// Function to create a DOCX file and download it
+function downloadOCRAsDocx(ocrText, fontInfo) {
+    const doc = new PizZip();
+    const template = docxtemplater(new PizZip("")); // Empty template
+
+    template.setData({
+        ocrText,
+        fontInfo
+    });
+
+    template.render();
+
+    const output = template.getZip().generate({ type: 'blob' });
+
+    const blob = new Blob([output], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'OCR_Result.docx';
+    link.click();
 }
 
 // Attach event listeners
