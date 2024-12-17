@@ -127,21 +127,35 @@
 
         // Detect font using the pre-trained TensorFlow.js model
         async function detectFont(image) {
-            const model = await tf.loadLayersModel('./models/model.json');
-            console.log('Loaded Model:', model); // Debug model loading
-            console.log('Model Input Shape:', model.input.shape); // Debug the input shape
-
-            const preprocessedImage = preprocessImage(image);
-            const predictions = await model.predict(preprocessedImage).data();
-            const fontClassIndex = predictions.indexOf(Math.max(...predictions));
-            const fontClasses = ["Khmer OS", "Khmer OS Battambong", "Khmer OS Siemreap"];
-            const predictedFont = fontClasses[fontClassIndex];
-
-            console.log('Predicted Font:', predictedFont);
-            console.log('Prediction Confidence:', predictions[fontClassIndex]);
-
-            return { font: predictedFont, confidence: predictions[fontClassIndex] };
+            try {
+                // Load the model
+                const model = await tf.loadLayersModel('./models/model.json');
+                
+                // Preprocess the image
+                const preprocessedImage = preprocessImage(image);
+        
+                // Check if the model is expecting the correct shape
+                console.log("Model Input Shape: ", model.inputShape);  // Log input shape to debug
+        
+                // Ensure the input tensor has the correct shape
+                const inputTensor = preprocessedImage.expandDims(0);  // Add batch dimension: [1, 256, 256, 1]
+        
+                // Make the prediction
+                const predictions = await model.predict(inputTensor).data();
+        
+                // Find the font class with the highest confidence
+                const fontClassIndex = predictions.indexOf(Math.max(...predictions));
+                const fontClasses = ["Khmer OS", "Khmer OS Battambong", "Khmer OS Siemreap"];
+                const predictedFont = fontClasses[fontClassIndex];
+        
+                // Return the result
+                return { font: predictedFont, confidence: predictions[fontClassIndex] };
+            } catch (error) {
+                console.error("Error detecting font:", error);
+                return { font: "Unknown", confidence: 0 };
+            }
         }
+
 
         // Preprocess image for font classification
         function preprocessImage(image, targetSize = [256, 256]) {
