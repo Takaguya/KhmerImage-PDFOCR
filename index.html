@@ -139,10 +139,13 @@
         // Preprocess image for font classification
         function preprocessImage(image, targetSize = [256, 256]) {
             return tf.tidy(() => {
+                // Convert image to grayscale (single channel)
                 const tensor = tf.browser.fromPixels(image)
-                    .resizeBilinear(targetSize)
-                    .div(tf.scalar(255))
-                    .expandDims(0);  // Add batch dimension
+                    .mean(2)  // Take the average of the R, G, and B channels (grayscale)
+                    .toInt()  // Convert to integers (for better performance)
+                    .expandDims(-1)  // Add channel dimension (since it's single-channel grayscale)
+                    .resizeBilinear(targetSize)  // Resize to the target size
+                    .div(tf.scalar(255));  // Normalize the pixel values to [0, 1]
                 return tensor;
             });
         }
