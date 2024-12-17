@@ -40,7 +40,7 @@ async function detectFont(image) {
 
 // Handle file upload and process it
 async function handleUpload() {
-    const fileInput = document.getElementById('file-input');
+    const fileInput = document.getElementById('file');
     const file = fileInput.files[0];
 
     if (!file) {
@@ -49,7 +49,7 @@ async function handleUpload() {
     }
 
     const fileExt = file.name.split('.').pop().toLowerCase();
-    const outputArea = document.getElementById('output-area');
+    const outputArea = document.getElementById('font-detected');
     const spinner = document.getElementById('loading-spinner');
     spinner.style.display = 'block';  // Show loading spinner
 
