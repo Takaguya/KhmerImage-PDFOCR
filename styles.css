@@ -109,19 +109,10 @@ body {
     background-color: #b71c1c;
 }
 
-/* Result Container - Centering and Container Wrap */
-.result-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    margin-top: 40px;
-    padding: 20px;
-}
-
+/* Result Container */
 .result-container {
-    width: 100%;
     max-width: 900px;
+    margin: 30px auto;
     padding: 20px;
     background: #fff;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
