@@ -7,7 +7,7 @@
     <!-- Styles -->
     <link rel="stylesheet" href="styles.css">
     <!-- Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script> <!-- TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxjs"></script> <!-- ONNX.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script> <!-- PDF.js -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js"></script> <!-- Tesseract.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/0.4.1/html2canvas.min.js"></script> <!-- html2canvas -->
@@ -168,11 +168,17 @@
             });
         }
 
-        // Detect font using the pre-trained TensorFlow.js model
+        // Detect font using the pre-trained ONNX model
         async function detectFont(image) {
-            const model = await tf.loadLayersModel('./models/model.json');
+            const session = new onnx.InferenceSession();
+            await session.loadModel('./models/model.onnx');  // Path to your ONNX model
+
             const preprocessedImage = preprocessImage(image);
-            const predictions = await model.predict(preprocessedImage).data();
+            const inputTensor = new onnx.Tensor(preprocessedImage.dataSync(), 'float32', preprocessedImage.shape);
+
+            const output = await session.run([inputTensor]);
+            const predictions = output.values().next().value.data;
+
             const fontClassIndex = predictions.indexOf(Math.max(...predictions));
             const fontClasses = ["Khmer OS", "Khmer OS Battambong", "Khmer OS Siemreap"];
             const predictedFont = fontClasses[fontClassIndex];
@@ -186,7 +192,7 @@
             return {
                 font: predictedFont,
                 confidence: predictions[fontClassIndex],
-                fontClass: fontClassMap[predictedFont]  // Return the corresponding CSS class
+                fontClass: fontClassMap[predictedFont]
             };
         }
 
@@ -235,29 +241,26 @@
                 textData.push(ocrText);
             }
 
-            return { text: textData.join('\n\n'), font, confidence, fontClass };
+            return {
+                text: textData.join('\n'),
+                font,
+                confidence,
+                fontClass
+            };
         }
 
-        // Function to generate and download DOCX file
-        function generateDocx(ocrText) {
-            const zip = new JSZip();
-            const doc = new docxtemplater();
-            const content = `
-                <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-                    <w:body>
-                        <w:p>
-                            <w:r>
-                                <w:t>${ocrText}</w:t>
-                            </w:r>
-                        </w:p>
-                    </w:body>
-                </w:document>
-            `;
-            zip.file("word/document.xml", content);
-            zip.generateAsync({ type: "blob" }).then(function(content) {
-                const fileName = "OCR_Result.docx";
-                saveAs(content, fileName);
-            });
+        // Generate DOCX with the OCR text
+        function generateDocx(text) {
+            const doc = new Docxtemplater();
+            doc.loadZip(JSZip.loadAsync("data.docx"));
+            doc.setData({ text: text });
+            try {
+                doc.render();
+            } catch (e) {
+                console.error(e);
+            }
+            const out = doc.getZip().generate({ type: 'blob' });
+            saveAs(out, 'ocr_result.docx');
         }
     </script>
 </body>
