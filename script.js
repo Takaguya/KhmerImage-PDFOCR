@@ -8,6 +8,7 @@ async function loadModel() {
         console.log("Model loaded successfully!");
     } catch (error) {
         console.error("Error loading model:", error);
+        alert("Failed to load the model. Please try refreshing the page.");
     }
 }
 
@@ -21,46 +22,65 @@ fileInput.addEventListener('change', () => {
 // Preprocess the image for the model
 function preprocessImage(image) {
     return tf.tidy(() => {
-        const tensor = tf.browser.fromPixels(image)
-            .resizeBilinear([256, 256])
-            .div(tf.scalar(255))
-            .expandDims(0);
-        return tensor;
+        try {
+            const tensor = tf.browser.fromPixels(image)
+                .resizeBilinear([256, 256])
+                .div(tf.scalar(255))
+                .expandDims(0);
+            return tensor;
+        } catch (error) {
+            console.error("Error preprocessing image:", error);
+            throw new Error("Preprocessing failed");
+        }
     });
 }
 
 // Detect font
 async function detectFont(image) {
     if (!model) {
-        console.error("Model is not loaded. Please wait.");
-        return null;
+        throw new Error("Model is not loaded yet!");
     }
 
-    const preprocessedImage = preprocessImage(image);
-    const predictions = await model.predict(preprocessedImage).data();
-    const fontClassIndex = predictions.indexOf(Math.max(...predictions));
-    const confidence = predictions[fontClassIndex];
-    const fontClasses = ["Khmer OS", "Khmer OS Battambong", "Khmer OS Siemreap"];
-    const predictedFont = fontClasses[fontClassIndex];
+    try {
+        const preprocessedImage = preprocessImage(image);
+        const predictions = await model.predict(preprocessedImage).data();
+        const fontClassIndex = predictions.indexOf(Math.max(...predictions));
+        const confidence = predictions[fontClassIndex];
+        const fontClasses = ["Khmer OS", "Khmer OS Battambong", "Khmer OS Siemreap"];
+        const predictedFont = fontClasses[fontClassIndex];
 
-    return { font: predictedFont, confidence };
+        return { font: predictedFont, confidence };
+    } catch (error) {
+        console.error("Error during font detection:", error);
+        throw error;
+    }
 }
 
 // Extract images from PDF
 async function extractImagesFromPDF(pdfData) {
-    const loadingTask = pdfjsLib.getDocument({ data: pdfData });
-    const pdf = await loadingTask.promise;
-    const page = await pdf.getPage(1);
+    try {
+        const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+        const pdf = await loadingTask.promise;
+        const images = [];
 
-    const scale = 1.5;
-    const viewport = page.getViewport({ scale });
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+            const page = await pdf.getPage(pageNumber);
+            const scale = 1.5;
+            const viewport = page.getViewport({ scale });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
 
-    await page.render({ canvasContext: context, viewport }).promise;
-    return [canvas];
+            await page.render({ canvasContext: context, viewport }).promise;
+            images.push(canvas);
+        }
+
+        return images;
+    } catch (error) {
+        console.error("Error extracting images from PDF:", error);
+        throw error;
+    }
 }
 
 // Process uploaded file
@@ -75,13 +95,18 @@ async function handleUpload() {
     spinner.style.display = 'block'; // Show spinner
 
     try {
+        let image;
+        let imageSrc;
+
         if (file.type === 'application/pdf') {
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const pdfData = e.target.result;
                 const images = await extractImagesFromPDF(pdfData);
-                const result = await detectFont(images[0]);
-                displayResult(result, images[0].toDataURL());
+                image = images[0];
+                imageSrc = image.toDataURL();
+                const result = await detectFont(image);
+                displayResult(result, imageSrc);
             };
             reader.readAsArrayBuffer(file);
         } else {
@@ -89,8 +114,10 @@ async function handleUpload() {
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = async () => {
+                    image = img;
+                    imageSrc = e.target.result;
                     const result = await detectFont(img);
-                    displayResult(result, e.target.result);
+                    displayResult(result, imageSrc);
                 };
                 img.src = e.target.result;
             };
@@ -98,6 +125,7 @@ async function handleUpload() {
         }
     } catch (error) {
         console.error("Error processing file:", error);
+        alert("Failed to process the file. Please try again.");
     } finally {
         spinner.style.display = 'none'; // Hide spinner
     }
