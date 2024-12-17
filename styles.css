@@ -114,24 +114,12 @@ body {
 /* Result Container */
 .result-container {
     max-width: 900px;
-    margin: 30px auto;
+    margin: 30px auto; /* Center the container horizontally */
     padding: 20px;
     background: #fff;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     border-radius: 8px;
-    text-align: left;
-}
-
-.result-container h2 {
-    font-size: 24px;
-    font-weight: bold;
-    color: #333;
-    margin-bottom: 15px;
-}
-
-.result-container p {
-    font-size: 16px;
-    color: #555;
+    text-align: center; /* Center text inside the result container */
 }
 
 /* Font Detection Result */
@@ -160,6 +148,7 @@ body {
     max-height: 400px;
     overflow-y: auto;
     width: 100%;
+    text-align: left; /* Keep the document text left-aligned */
 }
 
 /* Button for Downloading DOCX */
