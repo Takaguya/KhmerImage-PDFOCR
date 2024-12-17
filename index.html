@@ -12,6 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js"></script> <!-- Tesseract.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.8.0/jszip.min.js"></script> <!-- JSZip -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script> <!-- FileSaver.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script> <!-- TensorFlow.js -->
 </head>
 <body>
     <header class="main-header">
@@ -67,12 +68,14 @@
     </main>
 
     <script>
+        // File selection handler
         document.getElementById('file').addEventListener('change', function() {
             const fileName = this.files[0]?.name || 'No file selected';
             document.getElementById('file-name').innerText = fileName;
         });
 
-        document.getElementById('process-button').addEventListener('click', async function() {
+        // Process button click handler
+        document.getElementById('process-button').addEventListener('click', async function () {
             const fileInput = document.getElementById('file');
             const file = fileInput.files[0];
             const outputArea = document.getElementById('font-detected');
@@ -93,33 +96,33 @@
 
             try {
                 let ocrText = '';
-                let font = '';
-                let confidence = '';
+                let font = 'Unknown Font'; // Default value
+                let confidence = 'N/A'; // Default value
+                let fontClass = '';
 
                 if (fileExt === 'pdf') {
                     const pdfText = await processPDF(file);
                     ocrText = pdfText.text;
-                    font = pdfText.font;
-                    confidence = pdfText.confidence;
                 } else if (['jpg', 'jpeg', 'png', 'bmp', 'tiff'].includes(fileExt)) {
                     const img = await loadImage(file);
-                    const { font: detectedFont, confidence: detectedConfidence } = await detectFont(img);
+                    const fontDetection = await detectFont(img);
                     ocrText = await runOCR(img);
-                    font = detectedFont;
-                    confidence = detectedConfidence;
+                    font = fontDetection.font || 'Unknown Font';
+                    confidence = fontDetection.confidence?.toFixed(2) || 'N/A';
+                    fontClass = fontDetection.fontClass || '';
                 } else {
                     alert("Unsupported file type.");
                     return;
                 }
 
                 resultContainer.style.display = 'block';
-                outputArea.innerHTML = `Font Detected: ${font}`;
+                outputArea.innerHTML = `Font Detected: <span class="${fontClass}">${font}</span>`;
                 confidenceArea.innerHTML = `Confidence: ${confidence}`;
                 ocrTextArea.innerHTML = `<pre>${ocrText}</pre>`;
                 downloadButton.style.display = 'inline-block';
 
                 downloadButton.addEventListener('click', () => {
-                    generateDocx(ocrText);
+                    generateDocx(ocrText, font, confidence);
                 });
             } catch (error) {
                 outputArea.innerHTML = `<p>Error: ${error.message}</p>`;
@@ -128,63 +131,70 @@
             }
         });
 
-        function loadImage(file) {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => resolve(img);
-                img.onerror = reject;
-                img.src = URL.createObjectURL(file);
+        // Detect font function
+        async function detectFont(image) {
+            const session = new onnx.InferenceSession();
+            await session.loadModel('./models/model.onnx');
+            const preprocessedImage = preprocessImage(image);
+            const inputTensor = new onnx.Tensor(preprocessedImage.dataSync(), 'float32', preprocessedImage.shape);
+            const output = await session.run([inputTensor]);
+            const predictions = output.values().next().value.data;
+            const fontClasses = ["Khmer OS", "Khmer OS Battambong", "Khmer OS Siemreap"];
+            const fontClassIndex = predictions.indexOf(Math.max(...predictions));
+            return {
+                font: fontClasses[fontClassIndex],
+                confidence: predictions[fontClassIndex],
+                fontClass: `font-${fontClasses[fontClassIndex].toLowerCase().replace(/\s+/g, '-')}`
+            };
+        }
+
+        // Preprocess image
+        function preprocessImage(image, targetSize = [256, 256]) {
+            return tf.tidy(() => {
+                return tf.browser.fromPixels(image)
+                    .resizeBilinear(targetSize)
+                    .div(tf.scalar(255))
+                    .expandDims(0);
             });
         }
 
+        // OCR function
         function runOCR(image) {
-            return new Promise((resolve, reject) => {
-                Tesseract.recognize(
-                    image,
-                    'khm+eng',
-                    {
-                        logger: (m) => console.log(m),
-                    }
-                ).then(({ data: { text } }) => {
-                    resolve(text);
-                }).catch(reject);
-            });
+            return Tesseract.recognize(
+                image,
+                'khm+eng',
+                { logger: (m) => console.log(m) }
+            ).then(({ data: { text } }) => text);
         }
 
+        // Process PDF
         async function processPDF(file) {
             const pdf = await pdfjsLib.getDocument(URL.createObjectURL(file)).promise;
             const textData = [];
-
             for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
                 const page = await pdf.getPage(pageNumber);
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
                 const viewport = page.getViewport({ scale: 1 });
+                const canvas = document.createElement('canvas');
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
-                await page.render({ canvasContext: context, viewport }).promise;
-
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
                 const image = canvas.toDataURL();
                 const img = new Image();
                 img.src = image;
-
-                const ocrText = await runOCR(img);
-                textData.push(ocrText);
+                textData.push(await runOCR(img));
             }
-
             return { text: textData.join('\n') };
         }
 
-        function generateDocx(text) {
+        // DOCX file generator
+        function generateDocx(text, font, confidence) {
             const zip = new JSZip();
             const docContent = `
             <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
                 <w:body>
-                    <w:p>
-                        <w:r>
-                            <w:t>${text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</w:t>
-                        </w:r>
-                    </w:p>
+                    <w:p><w:r><w:t>Detected Font: ${font}</w:t></w:r></w:p>
+                    <w:p><w:r><w:t>Confidence: ${confidence}</w:t></w:r></w:p>
+                    <w:p><w:r><w:t>${text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</w:t></w:r></w:p>
                 </w:body>
             </w:document>`;
             zip.file('word/document.xml', docContent);
@@ -195,15 +205,7 @@
                 <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
                 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
             </Types>`);
-            zip.file('_rels/.rels', `
-            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-            <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-                <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-            </Relationships>`);
-
-            zip.generateAsync({ type: 'blob' }).then(function (content) {
-                saveAs(content, 'ocr_result.docx');
-            });
+            zip.generateAsync({ type: 'blob' }).then(content => saveAs(content, 'ocr_result.docx'));
         }
     </script>
 </body>
