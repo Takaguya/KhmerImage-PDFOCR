@@ -134,8 +134,19 @@ body {
     color: #555;
 }
 
-/* Document Content Display */
-.doc-content {
+/* Font Detection Result */
+.font-detection-result h3 {
+    font-size: 20px;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.font-detection-result p {
+    font-size: 16px;
+    color: #555;
+}
+
+.doc-preview {
     font-family: 'Courier New', monospace;
     white-space: pre-wrap;
     word-wrap: break-word;
@@ -151,8 +162,8 @@ body {
     width: 100%;
 }
 
-/* Download Button */
-.download-button {
+/* Button for Downloading DOCX */
+#download-docx {
     display: inline-block;
     margin-top: 15px;
     padding: 12px 20px;
@@ -162,11 +173,24 @@ body {
     border-radius: 5px;
     font-size: 16px;
     text-align: center;
+    cursor: pointer;
     transition: background-color 0.3s ease;
 }
 
-.download-button:hover {
+#download-docx:hover {
     background-color: #b71c1c;
+}
+
+/* Loading Spinner */
+#loading-spinner {
+    display: none;
+    text-align: center;
+    margin-top: 30px;
+}
+
+#loading-spinner img {
+    width: 50px;
+    height: 50px;
 }
 
 /* Error Message */
@@ -179,21 +203,6 @@ body {
     text-align: center;
     margin: 20px 0;
     font-size: 16px;
-}
-
-/* Spinner */
-.spinner {
-    display: block;
-    margin: 20px auto;
-    width: 50px;
-    height: 50px;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    100% {
-        transform: rotate(360deg);
-    }
 }
 
 /* Responsive Design */
@@ -212,7 +221,12 @@ body {
         padding: 15px;
     }
 
-    .doc-content {
+    .doc-preview {
         max-height: 300px;
+    }
+
+    #download-docx {
+        font-size: 14px;
+        padding: 10px 15px;
     }
 }
