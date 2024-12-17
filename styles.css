@@ -10,11 +10,6 @@ body {
     background-color: #f9f9f9;
     color: #333;
     line-height: 1.6;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    flex-direction: column;
 }
 
 /* Main Header Section */
@@ -22,14 +17,12 @@ body {
     background-color: #fff;
     border-bottom: 2px solid #d32f2f;
     padding: 20px 0;
-    width: 100%;
-    text-align: center;
 }
 
 .top-section {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 20px;
@@ -56,6 +49,15 @@ body {
     font-size: 20px;
     color: #555;
     font-weight: normal;
+}
+
+.red-bar {
+    background-color: #d32f2f;
+    color: white;
+    text-align: center;
+    padding: 10px 0;
+    font-size: 16px;
+    font-weight: bold;
 }
 
 /* Form Container */
@@ -112,12 +114,12 @@ body {
 /* Result Container */
 .result-container {
     max-width: 900px;
-    margin: 30px auto;
+    margin: 30px auto; /* Center the container horizontally */
     padding: 20px;
     background: #fff;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     border-radius: 8px;
-    text-align: center; /* Ensures that content inside is centered */
+    text-align: center; /* Center text inside the result container */
 }
 
 /* Font Detection Result */
@@ -146,7 +148,7 @@ body {
     max-height: 400px;
     overflow-y: auto;
     width: 100%;
-    text-align: left; /* Keep text left-aligned for the document content */
+    text-align: left; /* Keep the document text left-aligned */
 }
 
 /* Button for Downloading DOCX */
