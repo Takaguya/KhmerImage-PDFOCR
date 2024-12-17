@@ -9,6 +9,9 @@
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script> <!-- TensorFlow.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script> <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/2.1.1/tesseract.min.js"></script> <!-- Tesseract.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.0.6/pizzip.min.js"></script> <!-- PizZip -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.19.0/docxtemplater.min.js"></script> <!-- Docxtemplater -->
 </head>
 <body>
     <header class="main-header">
@@ -53,6 +56,8 @@
         <section id="font-detected" class="font-detection-result">
             <!-- Results will be displayed here -->
         </section>
+
+        <button id="download-button" style="display: none;">Download OCR as DOCX</button>
     </main>
 
     <!-- Link to the external JS file -->
