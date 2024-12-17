@@ -1,31 +1,38 @@
 let model;
 
-// Load the TensorFlow.js model
+// Load TensorFlow.js model
 async function loadModel() {
     try {
-        const modelUrl = './models/model.json'; // Adjust this path as needed
+        const modelUrl = './models/model.json'; // Adjust the path if necessary
         model = await tf.loadLayersModel(modelUrl);
         console.log("Model loaded successfully!");
     } catch (error) {
-        console.error("Failed to load the model. Please check the model path or server configuration.", error);
+        console.error("Error loading model:", error);
     }
 }
 
-// Preprocess the image before passing it to the model
+// Handle file input change
+const fileInput = document.getElementById('file');
+fileInput.addEventListener('change', () => {
+    const fileNameDisplay = document.getElementById('file-name');
+    fileNameDisplay.textContent = fileInput.files.length > 0 ? fileInput.files[0].name : 'No file selected';
+});
+
+// Preprocess the image for the model
 function preprocessImage(image) {
     return tf.tidy(() => {
         const tensor = tf.browser.fromPixels(image)
-            .resizeBilinear([256, 256])  // Resize to the input size expected by the model
-            .div(tf.scalar(255))         // Normalize to [0, 1]
-            .expandDims(0);              // Add batch dimension (1 image in a batch)
+            .resizeBilinear([256, 256])
+            .div(tf.scalar(255))
+            .expandDims(0);
         return tensor;
     });
 }
 
-// Detect the font from the image
+// Detect font
 async function detectFont(image) {
     if (!model) {
-        console.error("Model is not loaded yet! Please wait.");
+        console.error("Model is not loaded. Please wait.");
         return null;
     }
 
@@ -39,96 +46,81 @@ async function detectFont(image) {
     return { font: predictedFont, confidence };
 }
 
-// Handle file input and image processing
-async function handleUpload() {
-    const fileInput = document.getElementById('file');
-    const file = fileInput.files[0];
+// Extract images from PDF
+async function extractImagesFromPDF(pdfData) {
+    const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+    const pdf = await loadingTask.promise;
+    const page = await pdf.getPage(1);
 
+    const scale = 1.5;
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    await page.render({ canvasContext: context, viewport }).promise;
+    return [canvas];
+}
+
+// Process uploaded file
+async function handleUpload() {
+    const file = fileInput.files[0];
     if (!file) {
-        alert("Please upload a file first!");
+        alert("Please select a file!");
         return;
     }
 
-    const reader = new FileReader();
+    const spinner = document.getElementById('loading-spinner');
+    spinner.style.display = 'block'; // Show spinner
 
-    if (file.type === 'application/pdf') {
-        // Handle PDF files
-        reader.onload = async function(e) {
-            const pdfData = e.target.result;
-            const images = await extractImagesFromPDF(pdfData);
-            if (images.length > 0) {
-                const img = images[0];
-                const result = await detectFont(img);
-
-                displayResult(result, img.toDataURL());
-            } else {
-                console.error("No images extracted from the PDF.");
-            }
-        };
-        reader.readAsArrayBuffer(file);
-    } else {
-        // Handle image files
-        reader.onload = function(e) {
-            const img = new Image();
-            img.onload = async function() {
-                const result = await detectFont(img);
-                displayResult(result, e.target.result);
+    try {
+        if (file.type === 'application/pdf') {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const pdfData = e.target.result;
+                const images = await extractImagesFromPDF(pdfData);
+                const result = await detectFont(images[0]);
+                displayResult(result, images[0].toDataURL());
             };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
+            reader.readAsArrayBuffer(file);
+        } else {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = async () => {
+                    const result = await detectFont(img);
+                    displayResult(result, e.target.result);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    } catch (error) {
+        console.error("Error processing file:", error);
+    } finally {
+        spinner.style.display = 'none'; // Hide spinner
     }
 }
 
-// Display the result in the UI
+// Display results
 function displayResult(result, imageSrc) {
     const resultDiv = document.getElementById("font-detected");
-
     if (result) {
         resultDiv.innerHTML = `
             <h3>Detected Font:</h3>
             <p><strong>Font:</strong> ${result.font}</p>
             <p><strong>Confidence:</strong> ${result.confidence.toFixed(2)}</p>
-            <img src="${imageSrc}" alt="Uploaded Image" style="max-width: 200px; margin-top: 10px;">
+            <img src="${imageSrc}" alt="Uploaded Image" style="max-width: 100%; margin-top: 10px;">
         `;
     } else {
         resultDiv.innerHTML = `
             <h3>Error:</h3>
-            <p>Could not detect font. Ensure the model is loaded and the image is clear.</p>
+            <p>Font detection failed. Please try again.</p>
         `;
     }
 }
 
-// Extract images from PDF using pdf.js
-async function extractImagesFromPDF(pdfData) {
-    return new Promise((resolve, reject) => {
-        const loadingTask = pdfjsLib.getDocument({ data: pdfData });
-        loadingTask.promise.then(function(pdf) {
-            pdf.getPage(1).then(function(page) {
-                const scale = 1.5;
-                const viewport = page.getViewport({ scale: scale });
-                const canvas = document.createElement("canvas");
-                const context = canvas.getContext("2d");
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
-
-                const renderContext = {
-                    canvasContext: context,
-                    viewport: viewport
-                };
-
-                page.render(renderContext).promise.then(function() {
-                    resolve([canvas]); // Return the first page as an image (Canvas)
-                }).catch(reject);
-            });
-        }).catch(reject);
-    });
-}
-
-// Add event listeners
-window.addEventListener('DOMContentLoaded', () => {
-    loadModel(); // Load the model when the page loads
-
-    const processButton = document.getElementById('process-button');
-    processButton.addEventListener('click', handleUpload);
-});
+// Initialize
+document.getElementById('process-button').addEventListener('click', handleUpload);
+window.addEventListener('DOMContentLoaded', loadModel);
