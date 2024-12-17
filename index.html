@@ -4,16 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OCR File Processor</title>
+    <!-- Styles -->
     <link rel="stylesheet" href="styles.css">
+    <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script> <!-- TensorFlow.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script> <!-- PDF.js -->
+    <!-- Custom Scripts -->
     <script defer src="script.js"></script>
 </head>
 <body>
     <header class="main-header">
         <div class="top-section">
             <div class="logo">
-                <img src="images/rupp_logo.png" alt="University Logo" style="max-height: 100px;">
+                <img src="images/rupp_logo.png" alt="University Logo">
             </div>
             <div class="title">
                 <h1>សាកលវិទ្យាល័យភូមិន្ទភ្នំពេញ</h1>
@@ -26,31 +29,32 @@
         </div>
     </header>
 
-    <main class="form-container">
-        <h2 class="form-title">Upload Your File for OCR Processing</h2>
-        <form id="upload-form">
-            <label for="file">Choose a file:</label>
-            <input 
-                type="file" 
-                id="file" 
-                name="file" 
-                accept="image/*, .pdf" 
-                required
-                aria-label="Choose a file to upload"
-            >
-            <p id="file-name" style="margin-top: 10px; font-style: italic; color: gray;"></p>
-            <button type="button" id="process-button">Upload and Process</button>
-        </form>
+    <main>
+        <div class="form-container">
+            <h2 class="form-title">Upload Your File for OCR Processing</h2>
+            <form id="upload-form">
+                <label for="file" class="file-label">Choose a file:</label>
+                <input 
+                    type="file" 
+                    id="file" 
+                    name="file" 
+                    accept="image/*, .pdf" 
+                    required
+                    aria-label="Choose a file to upload"
+                >
+                <p id="file-name" style="margin-top: 10px; font-style: italic; color: gray;">No file selected</p>
+                <button type="button" id="process-button">Upload and Process</button>
+            </form>
+        </div>
+
+        <div id="loading-spinner" style="display: none;">
+            <p>Processing... Please wait.</p>
+            <img src="images/spinner.gif" alt="Loading spinner" class="spinner">
+        </div>
+
+        <section id="font-detected" class="font-detection-result">
+            <!-- Results will be displayed here -->
+        </section>
     </main>
-
-    <section id="font-detected" class="font-detection-result">
-        <!-- Results will be displayed here -->
-    </section>
-
-    <!-- Loading Spinner -->
-    <div id="loading-spinner" style="display: none; text-align: center; margin-top: 20px;">
-        <p>Processing...</p>
-        <img src="images/spinner.gif" alt="Loading spinner" style="width: 50px; height: 50px;">
-    </div>
 </body>
 </html>
