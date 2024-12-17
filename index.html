@@ -141,12 +141,17 @@
             return tf.tidy(() => {
                 // Convert image to grayscale (single channel)
                 const tensor = tf.browser.fromPixels(image)
-                    .mean(2)  // Take the average of the R, G, and B channels (grayscale)
-                    .toInt()  // Convert to integers (for better performance)
-                    .expandDims(-1)  // Add channel dimension (since it's single-channel grayscale)
+                    .mean(2)  // Convert to grayscale (average R, G, B channels)
+                    .toInt()  // Ensure integer values for better performance
+                    .expandDims(-1)  // Add the channel dimension (single-channel grayscale)
                     .resizeBilinear(targetSize)  // Resize to the target size
                     .div(tf.scalar(255));  // Normalize the pixel values to [0, 1]
-                return tensor;
+        
+                // Add batch dimension to shape [1, height, width, 1]
+                const batchedTensor = tensor.expandDims(0);  // Expanding to batch dimension [1, 256, 256, 1]
+                
+                console.log('Processed Tensor Shape:', batchedTensor.shape);  // Debug log
+                return batchedTensor;
             });
         }
 
