@@ -128,28 +128,33 @@
         // Detect font using the pre-trained TensorFlow.js model
         async function detectFont(image) {
             const model = await tf.loadLayersModel('./models/model.json');
+            console.log('Loaded Model:', model); // Debug model loading
+            console.log('Model Input Shape:', model.input.shape); // Debug the input shape
+
             const preprocessedImage = preprocessImage(image);
             const predictions = await model.predict(preprocessedImage).data();
             const fontClassIndex = predictions.indexOf(Math.max(...predictions));
             const fontClasses = ["Khmer OS", "Khmer OS Battambong", "Khmer OS Siemreap"];
             const predictedFont = fontClasses[fontClassIndex];
+
+            console.log('Predicted Font:', predictedFont);
+            console.log('Prediction Confidence:', predictions[fontClassIndex]);
+
             return { font: predictedFont, confidence: predictions[fontClassIndex] };
         }
 
         // Preprocess image for font classification
         function preprocessImage(image, targetSize = [256, 256]) {
             return tf.tidy(() => {
-                // Convert image to grayscale (single channel)
                 const tensor = tf.browser.fromPixels(image)
                     .mean(2)  // Convert to grayscale (average R, G, B channels)
                     .toInt()  // Ensure integer values for better performance
                     .expandDims(-1)  // Add the channel dimension (single-channel grayscale)
                     .resizeBilinear(targetSize)  // Resize to the target size
                     .div(tf.scalar(255));  // Normalize the pixel values to [0, 1]
-        
+
                 // Add batch dimension to shape [1, height, width, 1]
                 const batchedTensor = tensor.expandDims(0);  // Expanding to batch dimension [1, 256, 256, 1]
-                
                 console.log('Processed Tensor Shape:', batchedTensor.shape);  // Debug log
                 return batchedTensor;
             });
