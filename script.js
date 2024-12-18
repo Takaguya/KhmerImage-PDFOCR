@@ -26,12 +26,12 @@ loadModel().then(loadedSession => {
     console.error("Error loading ONNX model:", err);
 });
 
-// File selection handler
+
 document.getElementById('file').addEventListener('change', function () {
     const fileName = this.files[0]?.name || 'No file selected';
     document.getElementById('file-name').innerText = fileName;
 
-    // Show buttons once a file is selected
+    // No need to hide the buttons now, both will be shown even if no file is selected
     document.getElementById('detect-font-button').style.display = 'inline-block';
     document.getElementById('perform-ocr-button').style.display = 'inline-block';
 });
@@ -76,6 +76,45 @@ document.getElementById('detect-font-button').addEventListener('click', async fu
     }
 });
 
+// Handle Perform OCR Button Click
+document.getElementById('perform-ocr-button').addEventListener('click', async function () {
+    const fileInput = document.getElementById('file');
+    const file = fileInput.files[0];
+    const ocrTextArea = document.getElementById('ocr-text');
+    const resultContainer = document.getElementById('result-container');
+    const fileExt = file.name.split('.').pop().toLowerCase();
+
+    if (!file) {
+        alert('Please select a file');
+        return;
+    }
+
+    // Show loading spinner or hide results initially
+    resultContainer.style.display = 'none'; // Hide result initially
+
+    try {
+        let ocrText = '';
+
+        // Handle PDF files
+        if (fileExt === 'pdf') {
+            const pdfText = await processPDF(file);
+            ocrText = pdfText.text;
+        } 
+        // Handle image files (JPG, PNG, etc.)
+        else if (['jpg', 'jpeg', 'png', 'bmp', 'tiff'].includes(fileExt)) {
+            const img = await loadImage(file);
+            ocrText = await runOCR(img);
+        }
+
+        // Show the result container and populate the OCR result
+        resultContainer.style.display = 'block';
+        ocrTextArea.innerHTML = `<pre>${ocrText}</pre>`;
+
+    } catch (error) {
+        ocrTextArea.innerHTML = `<p>Error: ${error.message}</p>`;
+        console.error(error);
+    }
+});
 // Handle Perform OCR Button Click
 document.getElementById('perform-ocr-button').addEventListener('click', async function () {
     const fileInput = document.getElementById('file');
