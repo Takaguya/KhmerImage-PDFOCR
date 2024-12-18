@@ -68,12 +68,24 @@
     </main>
 
     <script>
+        const class_labels = {
+            "Khmer OS": 0,
+            "Khmer OS Battambong": 1,
+            "Khmer OS Siemreap": 2,
+            // Add more classes as needed
+        };
+    
+        // Load ONNX model
+        const onnxModelPath = 'model.onnx';
+        const session = new onnx.InferenceSession();
+        await session.loadModel(onnxModelPath);
+    
         // File selection handler
         document.getElementById('file').addEventListener('change', function() {
             const fileName = this.files[0]?.name || 'No file selected';
             document.getElementById('file-name').innerText = fileName;
         });
-
+    
         // Process button click handler
         document.getElementById('process-button').addEventListener('click', async function () {
             const fileInput = document.getElementById('file');
@@ -85,27 +97,27 @@
             const downloadButton = document.getElementById('download-docx');
             const resultContainer = document.getElementById('result-container');
             const fileExt = file.name.split('.').pop().toLowerCase();
-
+    
             if (!file) {
                 alert('Please select a file');
                 return;
             }
-
+    
             loadingSpinner.style.display = 'block';
             resultContainer.style.display = 'none';
-
+    
             try {
                 let ocrText = '';
                 let font = 'Unknown Font'; // Default value
                 let confidence = 'N/A'; // Default value
                 let fontClass = '';
-
+    
                 if (fileExt === 'pdf') {
                     const pdfText = await processPDF(file);
                     ocrText = pdfText.text;
                 } else if (['jpg', 'jpeg', 'png', 'bmp', 'tiff'].includes(fileExt)) {
                     const img = await loadImage(file);
-                    const fontDetection = await detectFont(img);
+                    const fontDetection = await cropAndPredict(img);
                     ocrText = await runOCR(img);
                     font = fontDetection.font || 'Unknown Font';
                     confidence = fontDetection.confidence?.toFixed(2) || 'N/A';
@@ -114,13 +126,13 @@
                     alert("Unsupported file type.");
                     return;
                 }
-
+    
                 resultContainer.style.display = 'block';
                 outputArea.innerHTML = `Font Detected: <span class="${fontClass}">${font}</span>`;
                 confidenceArea.innerHTML = `Confidence: ${confidence}`;
                 ocrTextArea.innerHTML = `<pre>${ocrText}</pre>`;
                 downloadButton.style.display = 'inline-block';
-
+    
                 downloadButton.addEventListener('click', () => {
                     generateDocx(ocrText, font, confidence);
                 });
@@ -130,34 +142,100 @@
                 loadingSpinner.style.display = 'none';
             }
         });
-
-        // Detect font function
-        async function detectFont(image) {
-            const session = new onnx.InferenceSession();
-            await session.loadModel('./models/model.onnx');
-            const preprocessedImage = preprocessImage(image);
-            const inputTensor = new onnx.Tensor(preprocessedImage.dataSync(), 'float32', preprocessedImage.shape);
-            const output = await session.run([inputTensor]);
-            const predictions = output.values().next().value.data;
-            const fontClasses = ["Khmer OS", "Khmer OS Battambong", "Khmer OS Siemreap"];
-            const fontClassIndex = predictions.indexOf(Math.max(...predictions));
-            return {
-                font: fontClasses[fontClassIndex],
-                confidence: predictions[fontClassIndex],
-                fontClass: `font-${fontClasses[fontClassIndex].toLowerCase().replace(/\s+/g, '-')}`
-            };
-        }
-
-        // Preprocess image
+    
+        // Preprocess image (updated based on your code)
         function preprocessImage(image, targetSize = [256, 256]) {
-            return tf.tidy(() => {
-                return tf.browser.fromPixels(image)
-                    .resizeBilinear(targetSize)
-                    .div(tf.scalar(255))
-                    .expandDims(0);
-            });
+            // Convert to grayscale as the model expects a single channel
+            const grayImage = image.bgrToGray();
+    
+            // Resize to target size
+            const resizedImage = grayImage.resize(targetSize[0], targetSize[1]);
+    
+            // Normalize the image to [0, 1]
+            const normalizedImage = resizedImage.div(255.0);
+    
+            // Add the channel dimension (1 for grayscale)
+            return normalizedImage.reshape([1, targetSize[0], targetSize[1], 1]);  // Shape is (1, height, width, 1)
         }
-
+    
+        // Detect words and crop
+        async function detectWordsAndCrop(imagePath) {
+            const image = await cv.imreadAsync(imagePath);
+    
+            // Convert the image to grayscale for OCR
+            const gray = image.bgrToGray();
+    
+            const config = {
+                lang: 'eng+km',  // Specify languages (English + Khmer)
+                psm: 6, // Page segmentation mode (uniform block of text)
+            };
+    
+            const { data: { text, conf, left, top, width, height } } = await tesseract.recognize(image, config);
+    
+            const wordBoxes = [];
+    
+            for (let i = 0; i < text.length; i++) {
+                if (parseInt(conf[i]) > 0) {
+                    const word = text[i].trim();
+                    if (word !== "") {
+                        wordBoxes.push({
+                            word,
+                            x: left[i],
+                            y: top[i],
+                            w: width[i],
+                            h: height[i],
+                            conf: parseInt(conf[i]),
+                        });
+                    }
+                }
+            }
+    
+            return { wordBoxes, image };
+        }
+    
+        // Crop and predict font (updated with the correct preprocess and model prediction)
+        async function cropAndPredict(imagePath, numWords = 3) {
+            const { wordBoxes, image } = await detectWordsAndCrop(imagePath);
+    
+            if (!wordBoxes.length) {
+                console.log("No text detected.");
+                return;
+            }
+    
+            // Limit to the first `numWords` detected words
+            const limitedWordBoxes = wordBoxes.slice(0, numWords);
+            const fontResults = [];
+    
+            // Crop each word and predict the font
+            for (const { word, x, y, w, h } of limitedWordBoxes) {
+                // Crop the region containing the word
+                const croppedImage = image.getRegion(new cv.Rect(x, y, w, h));
+    
+                // Preprocess the cropped image for prediction
+                const croppedImageRgb = preprocessImage(croppedImage);
+    
+                // Expand the batch dimension and convert to tensor
+                const inputTensor = new onnx.Tensor(croppedImageRgb.dataSync(), 'float32', [1, 1, 256, 256]);  // Shape (1, 1, 256, 256)
+    
+                // Run inference
+                const outputs = await session.run([inputTensor]);
+                const predictions = outputs[0].data;
+    
+                const predictedClass = predictions.indexOf(Math.max(...predictions));
+                const confidence = Math.max(...predictions);
+    
+                // Map predicted class to font name
+                const fontNames = Object.keys(class_labels);
+                fontResults.push({
+                    word,
+                    font: fontNames[predictedClass],
+                    confidence,
+                });
+            }
+    
+            return fontResults;
+        }
+    
         // OCR function
         function runOCR(image) {
             return Tesseract.recognize(
@@ -166,8 +244,8 @@
                 { logger: (m) => console.log(m) }
             ).then(({ data: { text } }) => text);
         }
-
-        // Process PDF
+    
+        // Process PDF (no changes needed here)
         async function processPDF(file) {
             const pdf = await pdfjsLib.getDocument(URL.createObjectURL(file)).promise;
             const textData = [];
@@ -185,14 +263,14 @@
             }
             return { text: textData.join('\n') };
         }
-
+    
         // DOCX file generator
         function generateDocx(text, font, confidence) {
             const zip = new JSZip();
-
+    
             // Escape any special HTML characters
             const escapedText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
+    
             // Create Word document content (XML format)
             const docContent = `
             <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
@@ -202,10 +280,10 @@
                     <w:p><w:r><w:t>${escapedText}</w:t></w:r></w:p>
                 </w:body>
             </w:document>`;
-
+    
             // Add content to the zip file (the document.xml part)
             zip.file('word/document.xml', docContent);
-
+    
             // Add additional required files for the DOCX format
             zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
             <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -213,18 +291,19 @@
                 <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
                 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
             </Types>`);
-
+    
             // Add relationships file (rels)
             zip.file('word/_rels/document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
             <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
                 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="document.xml"/>
             </Relationships>`);
-
+    
             // Generate the DOCX file as a blob
             zip.generateAsync({ type: 'blob' }).then(content => {
                 saveAs(content, 'ocr_result.docx');
             });
         }
     </script>
+
 </body>
 </html>
