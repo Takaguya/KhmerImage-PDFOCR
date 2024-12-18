@@ -16,6 +16,12 @@ document.getElementById('file').addEventListener('change', function() {
     document.getElementById('file-name').innerText = fileName;
 });
 
+// File selection handler
+document.getElementById('file').addEventListener('change', function() {
+    const fileName = this.files[0]?.name || 'No file selected';
+    document.getElementById('file-name').innerText = fileName;
+});
+
 // Process button click handler
 document.getElementById('process-button').addEventListener('click', async function () {
     const fileInput = document.getElementById('file');
@@ -73,7 +79,7 @@ document.getElementById('process-button').addEventListener('click', async functi
     }
 });
 
-// Preprocess image (updated based on your script)
+// Preprocess image
 function preprocessImage(image, targetSize = [256, 256]) {
     return tf.tidy(() => {
         return tf.browser.fromPixels(image)
@@ -83,7 +89,7 @@ function preprocessImage(image, targetSize = [256, 256]) {
     });
 }
 
-// Detect words and crop (updated for OCR)
+// Detect words and crop
 async function detectWordsAndCrop(imagePath) {
     const image = await cv.imreadAsync(imagePath);
     const gray = image.bgrToGray();
@@ -193,4 +199,5 @@ function generateDocx(text, font, confidence) {
         saveAs(content, 'ocr_result.docx');
     });
 }
+
 
