@@ -7,12 +7,12 @@
     <!-- Styles -->
     <link rel="stylesheet" href="styles.css">
     <!-- Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/onnxjs@latest"></script> <!-- ONNX.js -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script> <!-- ONNX.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script> <!-- PDF.js -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js"></script> <!-- Tesseract.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.8.0/jszip.min.js"></script> <!-- JSZip -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script> <!-- FileSaver.js -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script> <!-- TensorFlow.js -->
+    
 </head>
 <body>
     <header class="main-header">
@@ -45,9 +45,15 @@
                     aria-label="Choose a file to upload"
                 >
                 <p id="file-name" style="margin-top: 10px; font-style: italic; color: gray;">No file selected</p>
-                <button type="button" id="process-button">Upload and Process</button>
+                <button type="button" id="detect-font-button" style="display:none;">Detect Font</button>
+                <button type="button" id="perform-ocr-button" style="display:none;">Perform OCR</button>
             </form>
+            
+            <!-- Buttons for actions, hidden by default -->
+            
         </div>
+
+        <!-- Result container -->
         <div id="result-container" class="result-container" style="display: none;">
             <div class="font-detection-result">
                 <h3 id="font-detected"></h3>
@@ -62,7 +68,5 @@
     </main>
 
     <script src="script.js"></script>
-
-
 </body>
 </html>
