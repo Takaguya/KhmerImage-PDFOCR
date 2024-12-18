@@ -11,13 +11,7 @@ const session = new onnx.InferenceSession();
 await session.loadModel(onnxModelPath);
 
 // File selection handler
-document.getElementById('file').addEventListener('change', function() {
-    const fileName = this.files[0]?.name || 'No file selected';
-    document.getElementById('file-name').innerText = fileName;
-});
-
-// File selection handler
-document.getElementById('file').addEventListener('change', function() {
+document.getElementById('file').addEventListener('change', function () {
     const fileName = this.files[0]?.name || 'No file selected';
     document.getElementById('file-name').innerText = fileName;
 });
@@ -29,7 +23,6 @@ document.getElementById('process-button').addEventListener('click', async functi
     const outputArea = document.getElementById('font-detected');
     const confidenceArea = document.getElementById('confidence');
     const ocrTextArea = document.getElementById('ocr-text');
-    const loadingSpinner = document.getElementById('loading-spinner');
     const downloadButton = document.getElementById('download-docx');
     const resultContainer = document.getElementById('result-container');
     const fileExt = file.name.split('.').pop().toLowerCase();
@@ -39,8 +32,7 @@ document.getElementById('process-button').addEventListener('click', async functi
         return;
     }
 
-    loadingSpinner.style.display = 'block';
-    resultContainer.style.display = 'none';
+    resultContainer.style.display = 'none';  // Hide result container initially
 
     try {
         let ocrText = '';
@@ -63,7 +55,7 @@ document.getElementById('process-button').addEventListener('click', async functi
             return;
         }
 
-        resultContainer.style.display = 'block';
+        resultContainer.style.display = 'block'; // Show result container
         outputArea.innerHTML = `Font Detected: <span class="${fontClass}">${font}</span>`;
         confidenceArea.innerHTML = `Confidence: ${confidence}`;
         ocrTextArea.innerHTML = `<pre>${ocrText}</pre>`;
@@ -75,7 +67,7 @@ document.getElementById('process-button').addEventListener('click', async functi
     } catch (error) {
         outputArea.innerHTML = `<p>Error: ${error.message}</p>`;
     } finally {
-        loadingSpinner.style.display = 'none';
+        // No spinner logic needed, so just leave it out
     }
 });
 
