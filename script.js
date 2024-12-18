@@ -5,85 +5,93 @@ const class_labels = {
     // Add more classes as needed
 };
 
-// Load ONNX model
-const onnxModelPath = 'model.onnx';
-const session = new onnx.InferenceSession();
-await session.loadModel(onnxModelPath);
+// Create an async function to load the model
+async function loadModel() {
+    // Load ONNX model
+    const onnxModelPath = 'models/model.onnx';
+    const session = new onnx.InferenceSession();
+    await session.loadModel(onnxModelPath);
+    return session; // Return session for later use
+}
 
-// File selection handler
-// File selection handler
-document.getElementById('file').addEventListener('change', function () {
-    const fileName = this.files[0]?.name || 'No file selected';
-    document.getElementById('file-name').innerText = fileName;
-});
+// Wait for the model to be loaded before using it
+let session;
+loadModel().then(loadedSession => {
+    session = loadedSession; // Store the loaded session
 
-// Process button click handler
-document.getElementById('process-button').addEventListener('click', async function () {
-    const fileInput = document.getElementById('file');
-    const file = fileInput.files[0];
-    const outputArea = document.getElementById('font-detected');
-    const confidenceArea = document.getElementById('confidence');
-    const ocrTextArea = document.getElementById('ocr-text');
-    const downloadButton = document.getElementById('download-docx');
-    const resultContainer = document.getElementById('result-container');
-    const fileExt = file.name.split('.').pop().toLowerCase();
+    // File selection handler
+    document.getElementById('file').addEventListener('change', function () {
+        const fileName = this.files[0]?.name || 'No file selected';
+        document.getElementById('file-name').innerText = fileName;
+    });
 
-    if (!file) {
-        alert('Please select a file');
-        return;
-    }
+    // Process button click handler
+    document.getElementById('process-button').addEventListener('click', async function () {
+        const fileInput = document.getElementById('file');
+        const file = fileInput.files[0];
+        const outputArea = document.getElementById('font-detected');
+        const confidenceArea = document.getElementById('confidence');
+        const ocrTextArea = document.getElementById('ocr-text');
+        const downloadButton = document.getElementById('download-docx');
+        const resultContainer = document.getElementById('result-container');
+        const fileExt = file.name.split('.').pop().toLowerCase();
 
-    // Show loading spinner or hide results initially
-    resultContainer.style.display = 'none'; 
-    downloadButton.style.display = 'none'; // Hide download button initially
-
-    try {
-        let ocrText = '';
-        let font = 'Unknown Font'; // Default value
-        let confidence = 'N/A'; // Default value
-        let fontClass = '';
-
-        // Handle PDF files
-        if (fileExt === 'pdf') {
-            const pdfText = await processPDF(file);
-            ocrText = pdfText.text;
-        } 
-        // Handle image files (JPG, PNG, etc.)
-        else if (['jpg', 'jpeg', 'png', 'bmp', 'tiff'].includes(fileExt)) {
-            const img = await loadImage(file);
-            const fontDetection = await cropAndPredict(img);
-            ocrText = await runOCR(img);
-            font = fontDetection.font || 'Unknown Font';
-            confidence = fontDetection.confidence?.toFixed(2) || 'N/A';
-            fontClass = fontDetection.fontClass || '';
-        } 
-        else {
-            alert("Unsupported file type.");
+        if (!file) {
+            alert('Please select a file');
             return;
         }
 
-        // Show the result container and populate the fields
-        resultContainer.style.display = 'block';
-        outputArea.innerHTML = `Font Detected: <span class="${fontClass}">${font}</span>`;
-        confidenceArea.innerHTML = `Confidence: ${confidence}`;
-        ocrTextArea.innerHTML = `<pre>${ocrText}</pre>`;
+        // Show loading spinner or hide results initially
+        resultContainer.style.display = 'none'; 
+        downloadButton.style.display = 'none'; // Hide download button initially
 
-        // Show the download button after processing
-        downloadButton.style.display = 'inline-block';
+        try {
+            let ocrText = '';
+            let font = 'Unknown Font'; // Default value
+            let confidence = 'N/A'; // Default value
+            let fontClass = '';
 
-        // Add event listener for download button to generate DOCX
-        downloadButton.addEventListener('click', function () {
-            generateDocx(ocrText, font, confidence);
-        });
+            // Handle PDF files
+            if (fileExt === 'pdf') {
+                const pdfText = await processPDF(file);
+                ocrText = pdfText.text;
+            } 
+            // Handle image files (JPG, PNG, etc.)
+            else if (['jpg', 'jpeg', 'png', 'bmp', 'tiff'].includes(fileExt)) {
+                const img = await loadImage(file);
+                const fontDetection = await cropAndPredict(img);
+                ocrText = await runOCR(img);
+                font = fontDetection.font || 'Unknown Font';
+                confidence = fontDetection.confidence?.toFixed(2) || 'N/A';
+                fontClass = fontDetection.fontClass || '';
+            } 
+            else {
+                alert("Unsupported file type.");
+                return;
+            }
 
-    } catch (error) {
-        outputArea.innerHTML = `<p>Error: ${error.message}</p>`;
-    } finally {
-        // You can use this to hide the loading spinner, if needed
-        // loadingSpinner.style.display = 'none'; // Uncomment if you're using a spinner
-    }
+            // Show the result container and populate the fields
+            resultContainer.style.display = 'block';
+            outputArea.innerHTML = `Font Detected: <span class="${fontClass}">${font}</span>`;
+            confidenceArea.innerHTML = `Confidence: ${confidence}`;
+            ocrTextArea.innerHTML = `<pre>${ocrText}</pre>`;
+
+            // Show the download button after processing
+            downloadButton.style.display = 'inline-block';
+
+            // Add event listener for download button to generate DOCX
+            downloadButton.addEventListener('click', function () {
+                generateDocx(ocrText, font, confidence);
+            });
+
+        } catch (error) {
+            outputArea.innerHTML = `<p>Error: ${error.message}</p>`;
+        } finally {
+            // You can use this to hide the loading spinner, if needed
+            // loadingSpinner.style.display = 'none'; // Uncomment if you're using a spinner
+        }
+    });
 });
-
 
 // Preprocess image
 function preprocessImage(image, targetSize = [256, 256]) {
@@ -205,5 +213,3 @@ function generateDocx(text, font, confidence) {
         saveAs(content, 'ocr_result.docx');
     });
 }
-
-
