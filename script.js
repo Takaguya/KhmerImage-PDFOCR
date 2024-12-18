@@ -7,90 +7,113 @@ const class_labels = {
 
 // Create an async function to load the model
 async function loadModel() {
-    // Load ONNX model
-    const onnxModelPath = 'models/modified_model.onnx';
-    const session = new onnx.InferenceSession();
-    await session.loadModel(onnxModelPath);
-    return session; // Return session for later use
+    try {
+        const onnxModelPath = 'models/model.onnx';
+        const session = await new onnx.InferenceSession();
+        await session.loadModel(onnxModelPath);
+        console.log('Model loaded successfully');
+        return session; // Return session for later use
+    } catch (error) {
+        console.error('Error loading the ONNX model:', error);
+        throw error;
+    }
 }
 
-// Wait for the model to be loaded before using it
-let session;
+let session = null;  // Initialize session as null
 loadModel().then(loadedSession => {
-    session = loadedSession; // Store the loaded session
+    session = loadedSession;  // Store the loaded session
+}).catch(err => {
+    console.error("Error loading ONNX model:", err);
+});
 
-    // File selection handler
-    document.getElementById('file').addEventListener('change', function () {
-        const fileName = this.files[0]?.name || 'No file selected';
-        document.getElementById('file-name').innerText = fileName;
-    });
+// File selection handler
+document.getElementById('file').addEventListener('change', function () {
+    const fileName = this.files[0]?.name || 'No file selected';
+    document.getElementById('file-name').innerText = fileName;
 
-    // Process button click handler
-    document.getElementById('process-button').addEventListener('click', async function () {
-        const fileInput = document.getElementById('file');
-        const file = fileInput.files[0];
-        const outputArea = document.getElementById('font-detected');
-        const confidenceArea = document.getElementById('confidence');
-        const ocrTextArea = document.getElementById('ocr-text');
-        const downloadButton = document.getElementById('download-docx');
-        const resultContainer = document.getElementById('result-container');
-        const fileExt = file.name.split('.').pop().toLowerCase();
+    // Show buttons once a file is selected
+    document.getElementById('detect-font-button').style.display = 'inline-block';
+    document.getElementById('perform-ocr-button').style.display = 'inline-block';
+});
 
-        if (!file) {
-            alert('Please select a file');
-            return;
+// Handle Detect Font Button Click
+document.getElementById('detect-font-button').addEventListener('click', async function () {
+    const fileInput = document.getElementById('file');
+    const file = fileInput.files[0];
+    const outputArea = document.getElementById('font-detected');
+    const confidenceArea = document.getElementById('confidence');
+    const resultContainer = document.getElementById('result-container');
+    const fileExt = file.name.split('.').pop().toLowerCase();
+
+    if (!file) {
+        alert('Please select a file');
+        return;
+    }
+
+    // Show loading spinner or hide results initially
+    resultContainer.style.display = 'none'; // Hide result initially
+
+    try {
+        let font = 'Unknown Font'; // Default font
+        let confidence = 'N/A'; // Default confidence
+
+        // Handle image files (JPG, PNG, etc.)
+        if (['jpg', 'jpeg', 'png', 'bmp', 'tiff'].includes(fileExt)) {
+            const img = await loadImage(file); // Load image
+            const fontDetection = await cropAndPredict(img); // Your font detection logic
+            font = fontDetection.font || 'Unknown Font';
+            confidence = fontDetection.confidence?.toFixed(2) || 'N/A';
         }
 
-        // Show loading spinner or hide results initially
-        resultContainer.style.display = 'none'; 
-        downloadButton.style.display = 'none'; // Hide download button initially
+        // Show the result container and populate the fields
+        resultContainer.style.display = 'block';
+        outputArea.innerHTML = `Font Detected: ${font}`;
+        confidenceArea.innerHTML = `Confidence: ${confidence}`;
 
-        try {
-            let ocrText = '';
-            let font = 'Unknown Font'; // Default value
-            let confidence = 'N/A'; // Default value
-            let fontClass = '';
+    } catch (error) {
+        outputArea.innerHTML = `<p>Error: ${error.message}</p>`;
+        console.error(error);
+    }
+});
 
-            // Handle PDF files
-            if (fileExt === 'pdf') {
-                const pdfText = await processPDF(file);
-                ocrText = pdfText.text;
-            } 
-            // Handle image files (JPG, PNG, etc.)
-            else if (['jpg', 'jpeg', 'png', 'bmp', 'tiff'].includes(fileExt)) {
-                const img = await loadImage(file);
-                const fontDetection = await cropAndPredict(img);
-                ocrText = await runOCR(img);
-                font = fontDetection.font || 'Unknown Font';
-                confidence = fontDetection.confidence?.toFixed(2) || 'N/A';
-                fontClass = fontDetection.fontClass || '';
-            } 
-            else {
-                alert("Unsupported file type.");
-                return;
-            }
+// Handle Perform OCR Button Click
+document.getElementById('perform-ocr-button').addEventListener('click', async function () {
+    const fileInput = document.getElementById('file');
+    const file = fileInput.files[0];
+    const ocrTextArea = document.getElementById('ocr-text');
+    const resultContainer = document.getElementById('result-container');
+    const fileExt = file.name.split('.').pop().toLowerCase();
 
-            // Show the result container and populate the fields
-            resultContainer.style.display = 'block';
-            outputArea.innerHTML = `Font Detected: <span class="${fontClass}">${font}</span>`;
-            confidenceArea.innerHTML = `Confidence: ${confidence}`;
-            ocrTextArea.innerHTML = `<pre>${ocrText}</pre>`;
+    if (!file) {
+        alert('Please select a file');
+        return;
+    }
 
-            // Show the download button after processing
-            downloadButton.style.display = 'inline-block';
+    // Show loading spinner or hide results initially
+    resultContainer.style.display = 'none'; // Hide result initially
 
-            // Add event listener for download button to generate DOCX
-            downloadButton.addEventListener('click', function () {
-                generateDocx(ocrText, font, confidence);
-            });
+    try {
+        let ocrText = '';
 
-        } catch (error) {
-            outputArea.innerHTML = `<p>Error: ${error.message}</p>`;
-        } finally {
-            // You can use this to hide the loading spinner, if needed
-            // loadingSpinner.style.display = 'none'; // Uncomment if you're using a spinner
+        // Handle PDF files
+        if (fileExt === 'pdf') {
+            const pdfText = await processPDF(file);
+            ocrText = pdfText.text;
+        } 
+        // Handle image files (JPG, PNG, etc.)
+        else if (['jpg', 'jpeg', 'png', 'bmp', 'tiff'].includes(fileExt)) {
+            const img = await loadImage(file);
+            ocrText = await runOCR(img);
         }
-    });
+
+        // Show the result container and populate the OCR result
+        resultContainer.style.display = 'block';
+        ocrTextArea.innerHTML = `<pre>${ocrText}</pre>`;
+
+    } catch (error) {
+        ocrTextArea.innerHTML = `<p>Error: ${error.message}</p>`;
+        console.error(error);
+    }
 });
 
 // Preprocess image
@@ -101,60 +124,6 @@ function preprocessImage(image, targetSize = [256, 256]) {
             .div(tf.scalar(255))
             .expandDims(0);
     });
-}
-
-// Detect words and crop
-async function detectWordsAndCrop(imagePath) {
-    const image = await cv.imreadAsync(imagePath);
-    const gray = image.bgrToGray();
-    const config = { lang: 'eng+km', psm: 6 };
-    const { data: { text, conf, left, top, width, height } } = await tesseract.recognize(image, config);
-
-    const wordBoxes = [];
-    for (let i = 0; i < text.length; i++) {
-        if (parseInt(conf[i]) > 0) {
-            const word = text[i].trim();
-            if (word !== "") {
-                wordBoxes.push({
-                    word,
-                    x: left[i],
-                    y: top[i],
-                    w: width[i],
-                    h: height[i],
-                    conf: parseInt(conf[i]),
-                });
-            }
-        }
-    }
-    return { wordBoxes, image };
-}
-
-// Crop and predict font
-async function cropAndPredict(imagePath, numWords = 3) {
-    const { wordBoxes, image } = await detectWordsAndCrop(imagePath);
-
-    if (!wordBoxes.length) {
-        console.log("No text detected.");
-        return;
-    }
-
-    const limitedWordBoxes = wordBoxes.slice(0, numWords);
-    for (const { word, x, y, w, h } of limitedWordBoxes) {
-        const croppedImage = image.getRegion(new cv.Rect(x, y, w, h));
-        const croppedImageRgb = preprocessImage(croppedImage);
-        const inputTensor = new onnx.Tensor(croppedImageRgb.dataSync(), 'float32', [1, 1, 256, 256]);  // Shape (1, 1, 256, 256)
-
-        const outputs = await session.run([inputTensor]);
-        const predictions = outputs[0].data;
-
-        const predictedClass = predictions.indexOf(Math.max(...predictions));
-        const confidence = Math.max(...predictions);
-        const fontNames = Object.keys(class_labels);
-
-        // Show result on the page
-        document.getElementById('font-detected').innerHTML = `Font Detected: ${fontNames[predictedClass]}`;
-        document.getElementById('confidence').innerHTML = `Confidence: ${confidence.toFixed(4)}`;
-    }
 }
 
 // OCR function
@@ -180,6 +149,57 @@ async function processPDF(file) {
         textData.push(await runOCR(img));
     }
     return { text: textData.join('\n') };
+}
+
+// Load image from file input
+function loadImage(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = function (e) {
+            const img = new Image();
+            img.onload = function () {
+                resolve(img); // Resolve the promise with the image object
+            };
+            img.onerror = function () {
+                reject(new Error("Failed to load image."));
+            };
+            img.src = e.target.result;
+        };
+
+        reader.onerror = function () {
+            reject(new Error("Failed to read file."));
+        };
+
+        reader.readAsDataURL(file); // Read the file as a data URL
+    });
+}
+
+// Crop and predict font class
+async function cropAndPredict(image) {
+    if (!session) {
+        throw new Error("Model not loaded yet.");
+    }
+
+    // Preprocess the image
+    const processedImage = preprocessImage(image);
+
+    // Perform inference using the ONNX model
+    const output = await session.run({ input: processedImage });
+    const predictions = output.values().next().value.data;
+
+    // Get the predicted font class and confidence score
+    const predictedClass = predictions.indexOf(Math.max(...predictions));
+    const confidence = predictions[predictedClass];
+
+    // Map class index to font name
+    const font = Object.keys(class_labels)[predictedClass];
+
+    return {
+        font: font,
+        confidence: confidence,
+        fontClass: class_labels[font] // Optionally, add the font's numeric class label
+    };
 }
 
 // DOCX file generator function
