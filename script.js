@@ -8,7 +8,7 @@ const class_labels = {
 // Create an async function to load the model
 async function loadModel() {
     // Load ONNX model
-    const onnxModelPath = 'models/model.onnx';
+    const onnxModelPath = 'models/modified_model.onnx';
     const session = new onnx.InferenceSession();
     await session.loadModel(onnxModelPath);
     return session; // Return session for later use
