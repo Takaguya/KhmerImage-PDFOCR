@@ -13,18 +13,8 @@ async function loadModel() {
         await session.loadModel(onnxModelPath);
         console.log('Model loaded successfully');
         return session; // Return session for later use
-    } catch (error) {
-        console.error('Error loading the ONNX model:', error);
-        throw error;
-    }
 }
 
-let session = null;  // Initialize session as null
-loadModel().then(loadedSession => {
-    session = loadedSession;  // Store the loaded session
-}).catch(err => {
-    console.error("Error loading ONNX model:", err);
-});
 
 // Handle Detect Font Button Click
 document.getElementById('detect-font-button').addEventListener('click', async function () {
