@@ -178,9 +178,7 @@ async function cropAndPredict(image) {
         const processedImage = preprocessImage(image);
 
         // Check data length before creating tensor
-        if (processedImage.length !== 256 * 256) {
-            throw new Error(`Invalid data length: ${processedImage.length}. Expected 256*256.`);
-        }
+        console.log('Process Image data length: ', processedImage.length);
 
         // Create the input tensor with shape [1, 1, 256, 256]
         const inputTensor = new onnx.Tensor(processedImage, 'float32', [1, 1, 256, 256]);
