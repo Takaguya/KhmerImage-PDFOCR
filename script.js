@@ -173,99 +173,26 @@ async function cropAndPredict(image) {
         throw new Error("Model not loaded yet.");
     }
 
-    // Helper function for detecting words and getting bounding boxes (same as in the second code)
-    function detectWordsAndCrop(image) {
-        const gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY);
+    // Preprocess the image
+    const processedImage = preprocessImage(image);
 
-        // Use pytesseract to get bounding boxes around words (for demonstration purposes, this assumes pytesseract is available)
-        const customConfig = r'-l khm+eng --psm 6';  // PSM 6 assumes a single uniform block of text
-        const d = pytesseract.image_to_data(gray, { output_type: pytesseract.Output.DICT, config: customConfig, lang: 'eng+km' });
+    // Perform inference using the ONNX model
+    const output = await session.run({ input: processedImage });
+    const predictions = output.values().next().value.data;
 
-        const wordBoxes = [];
-        for (let i = 0; i < d.text.length; i++) {
-            if (parseInt(d.conf[i]) > 0 && d.text[i].trim() !== "") {
-                const { left, top, width, height } = d;
-                wordBoxes.push({
-                    word: d.text[i],
-                    x: left[i],
-                    y: top[i],
-                    w: width[i],
-                    h: height[i],
-                    confidence: parseInt(d.conf[i])
-                });
-            }
-        }
-        return { wordBoxes, image };
-    }
+    // Get the predicted font class and confidence score
+    const predictedClass = predictions.indexOf(Math.max(...predictions));
+    const confidence = predictions[predictedClass];
 
-    // Preprocess the image (same as before)
-    console.log("Preprocessing image...");
-    let processedImage = preprocessImage(image);
+    // Map class index to font name
+    const font = Object.keys(class_labels)[predictedClass];
 
-    // Check input tensor shape
-    console.log("Input tensor shape:", processedImage.shape);
-
-    // Remove extra dimension if present
-    processedImage = processedImage.squeeze([1]);  // Remove the second dimension
-
-    // Verify new shape after squeeze
-    console.log("Shape after squeeze:", processedImage.shape);
-
-    // Detect words and get bounding boxes
-    console.log("Detecting words...");
-    const { wordBoxes, image } = detectWordsAndCrop(image);
-
-    if (!wordBoxes.length) {
-        console.log("No text detected.");
-        return null;
-    }
-
-    // Limit to the first 3 detected words
-    const limitedWordBoxes = wordBoxes.slice(0, 3);
-
-    for (const { word, x, y, w, h, confidence } of limitedWordBoxes) {
-        // Crop the region containing the word
-        const croppedImage = image.slice(y, y + h, x, x + w);
-
-        // Preprocess the cropped image for prediction
-        let croppedImageRgb = preprocessImage(croppedImage);
-
-        // Flatten to match ONNX input requirements (batch size 1)
-        croppedImageRgb = np.expand_dims(croppedImageRgb, 0).astype(np.float32);
-
-        // Run inference using the ONNX model
-        try {
-            console.log("Running inference...");
-            const output = await session.run({ 'conv2d_input': croppedImageRgb });
-
-            // Log the output tensor and its data (raw prediction values)
-            const predictions = output.values().next().value.data;
-            console.log("Raw predictions:", predictions);
-
-            // Get the predicted font class and confidence score
-            const predictedClass = predictions.indexOf(Math.max(...predictions));  // Index of the highest confidence
-            const fontConfidence = predictions[predictedClass];
-
-            // Log the predicted class and confidence score
-            console.log(`Predicted Class Index: ${predictedClass}`);
-            console.log(`Confidence Score: ${fontConfidence}`);
-
-            // Map class index to font name (Ensure class_labels is correctly populated)
-            const font = class_labels[predictedClass] || 'Unknown Font';  // Default to 'Unknown Font' if not found
-            console.log(`Font Detected: ${font}`);
-
-            return {
-                font: font,
-                confidence: fontConfidence.toFixed(2) || 'N/A',  // Format the confidence to 2 decimal places
-                fontClass: predictedClass  // Optionally, include the numeric class label
-            };
-        } catch (error) {
-            console.error("Prediction error:", error);
-            throw new Error("Failed to perform prediction");
-        }
-    }
+    return {
+        font: font,
+        confidence: confidence,
+        fontClass: class_labels[font] // Optionally, add the font's numeric class label
+    };
 }
-
 
 
 
