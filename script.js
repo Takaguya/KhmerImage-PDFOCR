@@ -176,24 +176,30 @@ async function cropAndPredict(image) {
     // Preprocess the image
     const processedImage = preprocessImage(image);
 
-    // Perform inference using the ONNX model
-    const output = await session.run({ input: processedImage });
-    const predictions = output.values().next().value.data;
+    try {
+        // Perform inference using the ONNX model
+        const output = await session.run({ input: processedImage });
+        const predictions = output.values().next().value.data;
 
-    // Get the predicted font class and confidence score
-    const predictedClass = predictions.indexOf(Math.max(...predictions));
-    const confidence = predictions[predictedClass];
+        console.log("Predictions:", predictions);
 
-    // Map class index to font name
-    const font = Object.keys(class_labels)[predictedClass];
+        // Get the predicted font class and confidence score
+        const predictedClass = predictions.indexOf(Math.max(...predictions));
+        const confidence = predictions[predictedClass];
 
-    return {
-        font: font,
-        confidence: confidence,
-        fontClass: class_labels[font] // Optionally, add the font's numeric class label
-    };
+        // Map class index to font name
+        const font = class_labels[predictedClass];
+
+        return {
+            font: font || 'Unknown Font',  // Default to 'Unknown Font' if the font is not found
+            confidence: confidence.toFixed(2) || 'N/A',  // Default to 'N/A' if no confidence score is found
+            fontClass: predictedClass  // Optionally, include the numeric class label
+        };
+    } catch (error) {
+        console.error("Prediction error:", error);
+        throw new Error("Failed to perform prediction");
+    }
 }
-
 // DOCX file generator function
 function generateDocx(text, font, confidence) {
     const zip = new JSZip();
