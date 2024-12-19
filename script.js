@@ -175,9 +175,9 @@ async function cropAndPredict(image) {
 
     // Preprocess the image
     const processedImage = preprocessImage(image);
-
+    const inputTensor = new onnx.Tensor(preprocessedImage, 'float32', [1, 1, 256, 256]);
     // Perform inference using the ONNX model
-    const output = await session.run({ input: processedImage });
+    const output = await session.run([inputTensor]);
     const predictions = output.values().next().value.data;
 
     // Get the predicted font class and confidence score
