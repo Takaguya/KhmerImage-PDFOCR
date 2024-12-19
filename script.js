@@ -5,14 +5,15 @@ const class_labels = {
     // Add more classes as needed
 };
 
-const ort = require('onnxruntime-web'); 
+// Ensure the library is loaded
+const ort = window.ort;
 
 async function loadModel() {
     try {
-        const onnxModelPath = 'https://github.com/Takaguya/KhmerImage-PDFOCR/edit/main/models/model.onnx'; // Path to your ONNX model
-        const session = await ort.InferenceSession.create(onnxModelPath); // Use 'create' method
+        const onnxModelPath = 'models/model.onnx'; // Adjust if necessary
+        const session = await ort.InferenceSession.create(onnxModelPath);
         console.log('Model loaded successfully');
-        return session; // Return session for later use
+        return session;
     } catch (error) {
         console.error('Error loading the ONNX model:', error.message || error);
         console.error('Stack trace:', error.stack);
@@ -20,13 +21,13 @@ async function loadModel() {
     }
 }
 
-// Usage
-let session = null; // Initialize session as null
-loadModel().then(loadedSession => {
-    session = loadedSession; // Store the loaded session
+// Call the function and use the model session
+loadModel().then(session => {
+    console.log("ONNX model is ready to use!");
 }).catch(err => {
-    console.error("Error loading ONNX model:", err);
+    console.error("Failed to load the ONNX model:", err);
 });
+
 
 // Handle Detect Font Button Click
 document.getElementById('detect-font-button').addEventListener('click', async function () {
