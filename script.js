@@ -9,7 +9,7 @@ const ort = require('onnxruntime-web');
 
 async function loadModel() {
     try {
-        const onnxModelPath = 'models/model.onnx'; // Path to your ONNX model
+        const onnxModelPath = 'https://github.com/Takaguya/KhmerImage-PDFOCR/edit/main/models/model.onnx'; // Path to your ONNX model
         const session = await ort.InferenceSession.create(onnxModelPath); // Use 'create' method
         console.log('Model loaded successfully');
         return session; // Return session for later use
