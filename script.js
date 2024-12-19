@@ -177,12 +177,17 @@ async function cropAndPredict(image) {
     console.log("Preprocessing image...");
     const processedImage = preprocessImage(image);
 
+    // Add batch dimension to the processed image if necessary
+    const inputTensor = processedImage.expandDims(0);  // Ensure it has shape [1, channels, height, width]
 
     try {
+        // Verify input tensor shape and model's input name
+        console.log("Input tensor shape:", inputTensor.shape);
+
         // Perform inference using the ONNX model
         console.log("Running inference...");
-        const output = await session.run({ input: processedImage });
-        
+        const output = await session.run({ 'conv2d_input': inputTensor });
+
         // Log the output tensor and its data (raw prediction values)
         const predictions = output.values().next().value.data;
         console.log("Raw predictions:", predictions);
@@ -209,6 +214,7 @@ async function cropAndPredict(image) {
         throw new Error("Failed to perform prediction");
     }
 }
+
 
 // DOCX file generator function
 function generateDocx(text, font, confidence) {
