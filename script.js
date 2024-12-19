@@ -5,12 +5,12 @@ const class_labels = {
     // Add more classes as needed
 };
 
-// Create an async function to load the model
+const ort = require('onnxruntime-web'); 
+
 async function loadModel() {
     try {
-        const onnxModelPath = 'models/model.onnx';
-        const session = await new ort.InferenceSession();
-        await session.loadModel(onnxModelPath);
+        const onnxModelPath = 'models/model.onnx'; // Path to your ONNX model
+        const session = await ort.InferenceSession.create(onnxModelPath); // Use 'create' method
         console.log('Model loaded successfully');
         return session; // Return session for later use
     } catch (error) {
@@ -20,9 +20,10 @@ async function loadModel() {
     }
 }
 
-let session = null;  // Initialize session as null
+// Usage
+let session = null; // Initialize session as null
 loadModel().then(loadedSession => {
-    session = loadedSession;  // Store the loaded session
+    session = loadedSession; // Store the loaded session
 }).catch(err => {
     console.error("Error loading ONNX model:", err);
 });
