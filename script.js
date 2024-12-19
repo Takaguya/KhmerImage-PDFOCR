@@ -19,11 +19,13 @@ async function loadModel() {
 }
 
 // Call the function and use the model session
-loadModel().then(session => {
-    console.log("ONNX model is ready to use!");
+let session = null; // Initialize session as null
+loadModel().then(loadedSession => {
+    session = loadedSession; // Store the loaded session
 }).catch(err => {
-    console.error("Failed to load the ONNX model:", err);
+    console.error("Error loading ONNX model:", err);
 });
+
 
 
 // Handle Detect Font Button Click
