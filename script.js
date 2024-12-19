@@ -176,6 +176,19 @@ async function cropAndPredict(image) {
     // Preprocess the image
     const processedImage = preprocessImage(image);
     const inputTensor = new onnx.Tensor(processedImage, 'float32', [1, 1, 254, 254]);
+    const inputInfo = session.inputNames.map((name, index) => {
+        const input = session.inputMetadata[name];
+        return {
+          name: name,
+          shape: input.dims,
+          dataType: input.dataType
+        };
+      });
+
+      console.log('Input Tensor Information:', inputInfo);
+    } catch (error) {
+      console.error('Failed to load the model:', error);
+    }
     // Perform inference using the ONNX model
     const output = await session.run([inputTensor]);
     const predictions = output.values().next().value.data;
