@@ -9,12 +9,13 @@ const class_labels = {
 async function loadModel() {
     try {
         const onnxModelPath = 'models/model.onnx';
-        const session = await new onnx.InferenceSession();
+        const session = await new ort.InferenceSession();
         await session.loadModel(onnxModelPath);
         console.log('Model loaded successfully');
         return session; // Return session for later use
     } catch (error) {
-        console.error('Error loading the ONNX model:', error);
+        console.error('Error loading the ONNX model:', error.message || error);
+        console.error('Stack trace:', error.stack);
         throw error;
     }
 }
