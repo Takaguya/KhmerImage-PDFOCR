@@ -1,3 +1,6 @@
+// Ensure the library is loaded
+const ort = window.ort;
+
 const class_labels = {
     "Khmer OS": 0,
     "Khmer OS Battambong": 1,
@@ -5,8 +8,7 @@ const class_labels = {
     // Add more classes as needed
 };
 
-// Ensure the library is loaded
-const ort = window.ort;
+
 
 async function loadModel() {
     try {
