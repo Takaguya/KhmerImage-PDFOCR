@@ -174,25 +174,34 @@ async function cropAndPredict(image) {
     }
 
     // Preprocess the image
+    console.log("Preprocessing image...");
     const processedImage = preprocessImage(image);
+
 
     try {
         // Perform inference using the ONNX model
+        console.log("Running inference...");
         const output = await session.run({ input: processedImage });
+        
+        // Log the output tensor and its data (raw prediction values)
         const predictions = output.values().next().value.data;
-
-        console.log("Predictions:", predictions);
+        console.log("Raw predictions:", predictions);
 
         // Get the predicted font class and confidence score
-        const predictedClass = predictions.indexOf(Math.max(...predictions));
+        const predictedClass = predictions.indexOf(Math.max(...predictions));  // Index of the highest confidence
         const confidence = predictions[predictedClass];
+        
+        // Log the predicted class and confidence score
+        console.log(`Predicted Class Index: ${predictedClass}`);
+        console.log(`Confidence Score: ${confidence}`);
 
-        // Map class index to font name
-        const font = class_labels[predictedClass];
+        // Map class index to font name (Ensure class_labels is correctly populated)
+        const font = class_labels[predictedClass] || 'Unknown Font';  // Default to 'Unknown Font' if not found
+        console.log(`Font Detected: ${font}`);
 
         return {
-            font: font || 'Unknown Font',  // Default to 'Unknown Font' if the font is not found
-            confidence: confidence.toFixed(2) || 'N/A',  // Default to 'N/A' if no confidence score is found
+            font: font,
+            confidence: confidence.toFixed(2) || 'N/A',  // Format the confidence to 2 decimal places
             fontClass: predictedClass  // Optionally, include the numeric class label
         };
     } catch (error) {
@@ -200,6 +209,7 @@ async function cropAndPredict(image) {
         throw new Error("Failed to perform prediction");
     }
 }
+
 // DOCX file generator function
 function generateDocx(text, font, confidence) {
     const zip = new JSZip();
