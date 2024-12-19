@@ -178,7 +178,7 @@ async function cropAndPredict(image) {
         const processedImage = preprocessImage(image);
 
         // Create the input tensor with shape [1, 1, 254, 254]
-        const inputTensor = new onnx.Tensor(processedImage, 'float32', [1, 1, 256, 256]);
+        const inputTensor = new onnx.Tensor(processedImage, 'float32', [1, 256, 256]);
     
         // Perform inference using the ONNX model
         const output = await session.run([inputTensor]);
