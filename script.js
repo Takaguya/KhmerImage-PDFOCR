@@ -175,18 +175,21 @@ async function cropAndPredict(image) {
 
     // Preprocess the image
     console.log("Preprocessing image...");
-    const processedImage = preprocessImage(image);
+    let processedImage = preprocessImage(image);
 
-    // Add batch dimension to the processed image if necessary
-    const inputTensor = processedImage.expandDims(0);  // Ensure it has shape [1, channels, height, width]
+    // Check input tensor shape
+    console.log("Input tensor shape:", processedImage.shape);
 
+    // Remove extra dimension if present
+    processedImage = processedImage.squeeze([1]);  // Remove the second dimension
+
+    // Verify new shape after squeeze
+    console.log("Shape after squeeze:", processedImage.shape);
+
+    // Perform inference using the ONNX model
     try {
-        // Verify input tensor shape and model's input name
-        console.log("Input tensor shape:", inputTensor.shape);
-
-        // Perform inference using the ONNX model
         console.log("Running inference...");
-        const output = await session.run({ 'conv2d_input': inputTensor });
+        const output = await session.run({ 'conv2d_input': processedImage });
 
         // Log the output tensor and its data (raw prediction values)
         const predictions = output.values().next().value.data;
@@ -195,7 +198,7 @@ async function cropAndPredict(image) {
         // Get the predicted font class and confidence score
         const predictedClass = predictions.indexOf(Math.max(...predictions));  // Index of the highest confidence
         const confidence = predictions[predictedClass];
-        
+
         // Log the predicted class and confidence score
         console.log(`Predicted Class Index: ${predictedClass}`);
         console.log(`Confidence Score: ${confidence}`);
@@ -214,6 +217,7 @@ async function cropAndPredict(image) {
         throw new Error("Failed to perform prediction");
     }
 }
+
 
 
 // DOCX file generator function
