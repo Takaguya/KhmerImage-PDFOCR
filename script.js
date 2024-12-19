@@ -177,26 +177,27 @@ async function cropAndPredict(image) {
         // Preprocess the image
         const processedImage = preprocessImage(image);
 
-        // Create the input tensor with shape [1, 1, 254, 254]
-        const inputTensor = new onnx.Tensor(processedImage, 'float32', [1, 256, 256]);
-    
+        // Check data length before creating tensor
+        if (processedImage.length !== 256 * 256) {
+            throw new Error(`Invalid data length: ${processedImage.length}. Expected 256*256.`);
+        }
+
+        // Create the input tensor with shape [1, 1, 256, 256]
+        const inputTensor = new onnx.Tensor(processedImage, 'float32', [1, 1, 256, 256]);
+
         // Perform inference using the ONNX model
         const output = await session.run([inputTensor]);
 
-        // Log the output tensor
+        // Process output
         const predictions = output.values().next().value.data;
-
-        // Get the predicted font class and confidence score
-        const predictedClass = predictions.indexOf(Math.max(...predictions));  // Index of the highest confidence
+        const predictedClass = predictions.indexOf(Math.max(...predictions));
         const confidence = predictions[predictedClass];
-
-        // Map class index to font name
         const font = Object.keys(class_labels)[predictedClass];
 
         return {
             font: font,
-            confidence: confidence.toFixed(2),  // Format the confidence to 2 decimal places
-            fontClass: class_labels[font]  // Optionally, add the font's numeric class label
+            confidence: confidence.toFixed(2),
+            fontClass: class_labels[font]
         };
 
     } catch (error) {
