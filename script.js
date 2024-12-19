@@ -173,38 +173,48 @@ async function cropAndPredict(image) {
         throw new Error("Model not loaded yet.");
     }
 
-    // Preprocess the image
-    const processedImage = preprocessImage(image);
-    const inputTensor = new onnx.Tensor(processedImage, 'float32', [1, 1, 254, 254]);
-    const inputInfo = session.inputNames.map((name, index) => {
-        const input = session.inputMetadata[name];
+    try {
+        // Preprocess the image
+        const processedImage = preprocessImage(image);
+
+        // Create the input tensor with shape [1, 1, 254, 254]
+        const inputTensor = new onnx.Tensor(processedImage, 'float32', [1, 1, 254, 254]);
+
+        // Check input tensor information
+        const inputInfo = session.inputNames.map((name) => {
+            const input = session.inputMetadata[name];
+            return {
+                name: name,
+                shape: input.dims,
+                dataType: input.dataType
+            };
+        });
+
+        console.log('Input Tensor Information:', inputInfo);
+
+        // Perform inference using the ONNX model
+        const output = await session.run([inputTensor]);
+
+        // Log the output tensor
+        const predictions = output.values().next().value.data;
+
+        // Get the predicted font class and confidence score
+        const predictedClass = predictions.indexOf(Math.max(...predictions));  // Index of the highest confidence
+        const confidence = predictions[predictedClass];
+
+        // Map class index to font name
+        const font = Object.keys(class_labels)[predictedClass];
+
         return {
-          name: name,
-          shape: input.dims,
-          dataType: input.dataType
+            font: font,
+            confidence: confidence.toFixed(2),  // Format the confidence to 2 decimal places
+            fontClass: class_labels[font]  // Optionally, add the font's numeric class label
         };
-      });
 
-      console.log('Input Tensor Information:', inputInfo);
     } catch (error) {
-      console.error('Failed to load the model:', error);
+        console.error('Error during prediction:', error);
+        throw new Error('Failed to perform prediction');
     }
-    // Perform inference using the ONNX model
-    const output = await session.run([inputTensor]);
-    const predictions = output.values().next().value.data;
-
-    // Get the predicted font class and confidence score
-    const predictedClass = predictions.indexOf(Math.max(...predictions));
-    const confidence = predictions[predictedClass];
-
-    // Map class index to font name
-    const font = Object.keys(class_labels)[predictedClass];
-
-    return {
-        font: font,
-        confidence: confidence,
-        fontClass: class_labels[font] // Optionally, add the font's numeric class label
-    };
 }
 
 
